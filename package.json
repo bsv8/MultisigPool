@@ -1,0 +1,66 @@
+{
+  "name": "keymaster-multisig-pool",
+  "version": "1.5.0",
+  "description": "A multisig pool implementation with TypeScript and Go support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "types",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:go": "./scripts/build.sh",
+    "build:all": "./scripts/build.sh",
+    "dev": "tsup --watch",
+    "test": "jest",
+    "test:go": "go test ./...",
+    "test:all": "./scripts/test.sh",
+    "lint": "eslint src/**/*.ts",
+    "lint:go": "golangci-lint run",
+    "clean": "rm -rf dist build coverage.out coverage.html",
+    "prepublishOnly": "npm run build",
+    "publish:npm": "./scripts/publish-npm.sh",
+    "publish:go": "./scripts/publish-go.sh",
+    "publish:all": "./scripts/publish-all.sh"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@bsv/sdk": "^1.6.12"
+  },
+  "keywords": [
+    "multisig",
+    "pool",
+    "blockchain",
+    "typescript",
+    "golang"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bsv8/MultisigPool.git"
+  },
+  "author": "spycat55",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

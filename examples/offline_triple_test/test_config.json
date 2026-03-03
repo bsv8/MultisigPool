@@ -1,0 +1,16 @@
+{
+  "fee_rate": 0.5,
+  "end_height": 1687383,
+  "sequence_2": 2,
+  "new_client1_amount": 1500,
+  "final_locktime": 4294967295,
+  "final_sequence": 4294967295,
+  "client1_priv_hex": "2796e78fad7d383fa5236607eba52d9a1904325daf9b4da3d77be5ad15ab1dae",
+  "client2_priv_hex": "a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c",
+  "server_priv_hex": "e6d4d7685894d2644d1f4bf31c0b87f3f6aa8a3d7d4091eaa375e81d6c9f9091",
+  "fixed_utxo": {
+    "txid": "95911b4d18002cd89aa04692ff59ecc62902c481c5cc5fa659370cb6a91752e6",
+    "vout": 1,
+    "value": 55603
+  }
+}

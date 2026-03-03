@@ -1,0 +1,38 @@
+[package]
+name = "keymaster-multisig-rust"
+version = "0.1.0"
+edition = "2021"
+authors = ["Keymaster Team"]
+license = "MIT"
+description = "Rust implementation of Keymaster Multisig using bsv-wasm"
+repository = "https://github.com/your-org/MultisigPool"
+keywords = ["bitcoin", "bsv", "multisig", "cryptography"]
+categories = ["cryptography::cryptocurrencies"]
+
+[lib]
+name = "keymaster_multisig"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = { version = "0.6", optional = true }
+thiserror = "1.0"
+console_error_panic_hook = "0.1"
+hex = "0.4"
+bsv-wasm = { git = "https://github.com/Firaenix/bsv-wasm.git", optional = true }
+sha2 = "0.10"
+k256 = { version = "0.13", features = ["std"] }
+
+[features]
+default = []
+std = []
+wasm = ["wasm-bindgen", "bsv-wasm"]
+serde = ["serde-wasm-bindgen"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.docs.rs]
+all-features = true

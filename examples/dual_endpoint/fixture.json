@@ -1,0 +1,14 @@
+{
+  "clientPrivHex": "1c1a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738",
+  "serverPrivHex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "clientUtxos": [
+    {
+      "txid": "4d3c2b1a00000000000000000000000000000000000000000000000000000000",
+      "vout": 0,
+      "satoshis": 10000
+    }
+  ],
+  "endHeight": 800000,
+  "feeRate": 0.5,
+  "isMain": true
+}
