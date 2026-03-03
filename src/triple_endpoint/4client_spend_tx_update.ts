@@ -96,9 +96,7 @@ const SigHash = {
 					`输出分配 - 服务器: ${bTx.outputs[0].satoshis}, 客户端: ${bTx.outputs[1].satoshis}`
 				);
 			}
-
-			console.log('交易加载和更新完成:', bTx.toHex());
-
+	
 			return bTx;
 		} catch (error) {
 			throw new Error(`加载交易失败: ${error}`);

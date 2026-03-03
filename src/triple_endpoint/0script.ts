@@ -111,10 +111,7 @@ const SigHash = {
 			// 设置解锁脚本
 			tx.inputs[0].unlockingScript = new UnlockingScript();
 			tx.inputs[0].unlockingScript.chunks = unlockScript.chunks;
-
-			console.log('签名合并完成');
-			console.log('交易hex:', tx.toHex());
-
+	
 			return tx;
 		} catch (error) {
 			throw new Error(`合并签名失败: ${error}`);

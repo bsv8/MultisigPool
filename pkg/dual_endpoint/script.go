@@ -42,8 +42,6 @@ func MergeDualPoolSigForSpendTx(
 	}
 
 	bTx.Inputs[0].UnlockingScript = unScript
-	// fmt.Printf("aTx: %s\n", aTx.Hex())
-	fmt.Printf("bTx 2: %s\n", bTx.Hex())
 
 	return bTx, nil
 }

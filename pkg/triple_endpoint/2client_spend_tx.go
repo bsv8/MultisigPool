@@ -43,7 +43,6 @@ func SubBuildTripleFeePoolSpendTX(
 
 	// 创建初始交易的锁定脚本
 	prevMultisigScript, err := multisig.Lock([]*ec.PublicKey{serverPublicKey, aPublicKey, bPublicKey}, 2)
-	fmt.Printf("================================= prevMultisigScript: %s\n", prevMultisigScript.ToASM())
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create server locking script: %w", err)
 	}

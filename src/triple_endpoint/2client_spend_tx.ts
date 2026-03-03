@@ -119,9 +119,6 @@ interface TripleSpendTxResponse {
       // 更新客户端输出金额（扣除手续费）
       tx.outputs[1].satoshis = serverValue - fee;
 
-      console.log('------------------------------- BuildOneB success');
-      console.log('交易:', tx.toHex());
-      
       // 创建 A 方签名
       const SignOne = new MultiSig().signOne(
         tx, 

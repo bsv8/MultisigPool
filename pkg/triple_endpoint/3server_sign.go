@@ -45,6 +45,5 @@ func SpendTXTripleFeePoolBSign(
 		return nil, fmt.Errorf("b 重新签名输入 %d 失败: %v", 1, err)
 	}
 
-	fmt.Println("b 重新签名输入 1 成功 hex:", transactionObject.Hex())
 	return bSignByte, nil
 }
