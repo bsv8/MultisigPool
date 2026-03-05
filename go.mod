@@ -1,8 +1,6 @@
 module github.com/bsv8/MultisigPool
 
-go 1.24.3
-
-toolchain go1.24.4
+go 1.24
 
 require github.com/bsv-blockchain/go-sdk v1.2.4
 
