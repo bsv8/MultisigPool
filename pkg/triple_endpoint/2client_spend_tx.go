@@ -26,6 +26,32 @@ func SubBuildTripleFeePoolSpendTX(
 	isMain bool,
 	feeRate float64,
 ) (*tx.Transaction, uint64, error) {
+	return SubBuildTripleFeePoolSpendTXWithProof(
+		prevTxId,
+		serverValue,
+		endHeight,
+		serverPublicKey,
+		aPrivateKey,
+		bPublicKey,
+		isMain,
+		feeRate,
+		nil,
+	)
+}
+
+// SubBuildTripleFeePoolSpendTXWithProof 构造三方费用池付款交易，并可追加付款证明 OP_RETURN。
+// 当前三方实现仍然是 2-of-3 资金池，proof 只影响输出集合，不改变门限语义。
+func SubBuildTripleFeePoolSpendTXWithProof(
+	prevTxId string,
+	serverValue uint64, // server 提供金额
+	endHeight uint32, // 区块高度
+	serverPublicKey *ec.PublicKey,
+	aPrivateKey *ec.PrivateKey,
+	bPublicKey *ec.PublicKey,
+	isMain bool,
+	feeRate float64,
+	paymentProof []byte,
+) (*tx.Transaction, uint64, error) {
 	aAddress, err := libs.GetAddressFromPublicKey(aPrivateKey.PubKey(), isMain)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get client address: %w", err)
@@ -98,6 +124,17 @@ func SubBuildTripleFeePoolSpendTX(
 		Satoshis:      serverValue,
 		LockingScript: clientChangeScript,
 	})
+
+	opReturnScript, err := libs.BuildOptionalOpReturnScript(paymentProof)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create op_return locking script: %w", err)
+	}
+	if opReturnScript != nil {
+		transactionTwo.AddOutput(&tx.TransactionOutput{
+			Satoshis:      0,
+			LockingScript: opReturnScript,
+		})
+	}
 
 	// 做一个假的签名script，方便计算 size
 	unlockingScript, err := multisig.FakeSign(2)
@@ -175,8 +212,33 @@ func BuildTripleFeePoolSpendTX(
 	isMain bool,
 	feeRate float64,
 ) (*tx.Transaction, *[]byte, uint64, error) {
+	return BuildTripleFeePoolSpendTXWithProof(
+		A_Tx,
+		serverValue,
+		endHeight,
+		serverPublicKey,
+		aPrivateKey,
+		bPublicKey,
+		isMain,
+		feeRate,
+		nil,
+	)
+}
 
-	txTwo, amount, err := SubBuildTripleFeePoolSpendTX(A_Tx.TxID().String(), serverValue, endHeight, serverPublicKey, aPrivateKey, bPublicKey, isMain, feeRate)
+// BuildTripleFeePoolSpendTXWithProof 构建三方费用池付款交易，并支持可选二进制付款证明。
+func BuildTripleFeePoolSpendTXWithProof(
+	A_Tx *tx.Transaction,
+	serverValue uint64, // 服务器提供金额
+	endHeight uint32, // 区块高度
+	serverPublicKey *ec.PublicKey,
+	aPrivateKey *ec.PrivateKey,
+	bPublicKey *ec.PublicKey,
+	isMain bool,
+	feeRate float64,
+	paymentProof []byte,
+) (*tx.Transaction, *[]byte, uint64, error) {
+
+	txTwo, amount, err := SubBuildTripleFeePoolSpendTXWithProof(A_Tx.TxID().String(), serverValue, endHeight, serverPublicKey, aPrivateKey, bPublicKey, isMain, feeRate, paymentProof)
 	if err != nil {
 		log.Printf("BuildOneB error: %v", err)
 		return nil, nil, 0, err

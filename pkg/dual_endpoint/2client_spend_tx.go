@@ -27,6 +27,32 @@ func SubBuildDualFeePoolSpendTX(
 	isMain bool,
 	feeRate float64,
 ) (*tx.Transaction, uint64, error) {
+	return SubBuildDualFeePoolSpendTXWithProof(
+		prevTxId,
+		totalAmount,
+		serverAmount,
+		endHeight,
+		clientPrivateKey,
+		serverPublicKey,
+		isMain,
+		feeRate,
+		nil,
+	)
+}
+
+// SubBuildDualFeePoolSpendTXWithProof 构造双端费用池付款交易，并可追加付款证明 OP_RETURN。
+// proof 为空时不生成数据输出，保持旧交易结构与旧签名语义。
+func SubBuildDualFeePoolSpendTXWithProof(
+	prevTxId string,
+	totalAmount uint64, // 多签 UTXO 总金额
+	serverAmount uint64, // server 最终分配金额
+	endHeight uint32, // 区块高度
+	clientPrivateKey *ec.PrivateKey,
+	serverPublicKey *ec.PublicKey,
+	isMain bool,
+	feeRate float64,
+	paymentProof []byte,
+) (*tx.Transaction, uint64, error) {
 	clientAddress, err := libs.GetAddressFromPublicKey(clientPrivateKey.PubKey(), isMain)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get client address: %w", err)
@@ -99,6 +125,18 @@ func SubBuildDualFeePoolSpendTX(
 		Satoshis:      totalAmount - serverAmount,
 		LockingScript: clientChangeScript,
 	})
+
+	// 付款证明只影响交易输出集合，不参与金额分账；空 proof 保持旧输出结构。
+	opReturnScript, err := libs.BuildOptionalOpReturnScript(paymentProof)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create op_return locking script: %w", err)
+	}
+	if opReturnScript != nil {
+		transactionTwo.AddOutput(&tx.TransactionOutput{
+			Satoshis:      0,
+			LockingScript: opReturnScript,
+		})
+	}
 
 	// 做一个假的签名script，方便计算 size
 	unlockingScript, err := libs.FakeSign(2)
@@ -178,8 +216,33 @@ func BuildDualFeePoolSpendTX(
 	isMain bool,
 	feeRate float64,
 ) (*tx.Transaction, *[]byte, uint64, error) {
+	return BuildDualFeePoolSpendTXWithProof(
+		A_Tx,
+		totalAmount,
+		serverAmount,
+		endHeight,
+		clientPrivateKey,
+		serverPublicKey,
+		isMain,
+		feeRate,
+		nil,
+	)
+}
 
-	txTwo, amount, err := SubBuildDualFeePoolSpendTX(A_Tx.TxID().String(), totalAmount, serverAmount, endHeight, clientPrivateKey, serverPublicKey, isMain, feeRate)
+// BuildDualFeePoolSpendTXWithProof 构建双端费用池付款交易，并支持可选二进制付款证明。
+func BuildDualFeePoolSpendTXWithProof(
+	A_Tx *tx.Transaction,
+	totalAmount uint64, // UTXO 总金额
+	serverAmount uint64, // 服务器分配金额
+	endHeight uint32, // 区块高度
+	clientPrivateKey *ec.PrivateKey,
+	serverPublicKey *ec.PublicKey,
+	isMain bool,
+	feeRate float64,
+	paymentProof []byte,
+) (*tx.Transaction, *[]byte, uint64, error) {
+
+	txTwo, amount, err := SubBuildDualFeePoolSpendTXWithProof(A_Tx.TxID().String(), totalAmount, serverAmount, endHeight, clientPrivateKey, serverPublicKey, isMain, feeRate, paymentProof)
 	if err != nil {
 		log.Printf("BuildOneB error: %v", err)
 		return nil, nil, 0, err

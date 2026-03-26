@@ -2,6 +2,7 @@ import { PrivateKey, PublicKey } from '@bsv/sdk/primitives';
 // import Script from '@bsv/sdk/script/Script';
 import Transaction from '@bsv/sdk/transaction/Transaction';
 import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
+import LockingScript from '@bsv/sdk/script/LockingScript';
 // import { BaseChain } from '../tx/BaseChain';
 // import type { UTXO, BuildDualFeePoolBaseTxResponse } from '../tx/types';
 // import { TripleEndpointPool_1base_tx } from './triple_endpoint_pool_1base_tx';
@@ -11,6 +12,7 @@ import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
 // import { fromBase58Check } from '@bsv/sdk/primitives/utils';
 import MultiSig from '../libs/MULTISIG';
 import P2PKH from '../libs/P2PKH';
+import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
 // import unlock from 'lucide-svelte/icons/unlock';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
@@ -56,6 +58,7 @@ interface TripleSpendTxResponse {
     aPrivateKey: PrivateKey,
     bPublicKey: PublicKey,
     feeRate: number,
+    paymentProof?: OpReturnPayload | null,
   ): Promise<TripleSpendTxResponse> {
     try {
       // const prevTxId = aTx.id('hex');
@@ -103,6 +106,16 @@ interface TripleSpendTxResponse {
         lockingScript: clientChangeScript,
         satoshis: serverValue, // 初始设置为服务器提供的金额
       });
+
+      const opReturnScript = buildOptionalOpReturnScript(paymentProof);
+      if (opReturnScript) {
+        const opReturnLockingScript = new LockingScript();
+        opReturnLockingScript.chunks = opReturnScript.chunks;
+        tx.addOutput({
+          lockingScript: opReturnLockingScript,
+          satoshis: 0,
+        });
+      }
       
       // 计算交易大小和费用
       const txSize = tx.toBinary().length;
@@ -138,5 +151,27 @@ interface TripleSpendTxResponse {
       console.error('BuildTripleFeePoolSpendTX error:', error);
       throw error;
     }
+  }
+
+  export async function tripleBuildFeePoolSpendTXWithProof(
+    prevTxId: string,
+    serverValue: number,
+    endHeight: number,
+    serverPublicKey: PublicKey,
+    aPrivateKey: PrivateKey,
+    bPublicKey: PublicKey,
+    feeRate: number,
+    paymentProof?: OpReturnPayload | null,
+  ): Promise<TripleSpendTxResponse> {
+    return tripleBuildFeePoolSpendTX(
+      prevTxId,
+      serverValue,
+      endHeight,
+      serverPublicKey,
+      aPrivateKey,
+      bPublicKey,
+      feeRate,
+      paymentProof,
+    );
   }
 // }

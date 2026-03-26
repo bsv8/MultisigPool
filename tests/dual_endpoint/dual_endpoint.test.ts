@@ -1,6 +1,6 @@
 import { PrivateKey } from '@bsv/sdk/primitives';
 import { buildDualFeePoolBaseTx } from '../../src/dual_endpoint/1base_tx';
-import { buildDualFeePoolSpendTX } from '../../src/dual_endpoint/2client_spend_tx';
+import { buildDualFeePoolSpendTX, buildDualFeePoolSpendTXWithProof } from '../../src/dual_endpoint/2client_spend_tx';
 import * as base from '../../src/dual_endpoint/1base_tx';
 import Transaction from '@bsv/sdk/transaction/Transaction';
 import Script from '@bsv/sdk/script/Script';
@@ -9,6 +9,7 @@ import { TransactionSignature } from '@bsv/sdk';
 import { hash256 } from '@bsv/sdk/primitives/Hash';
 import * as ECDSA from '@bsv/sdk/primitives/ECDSA';
 import BigNumber from '@bsv/sdk/primitives/BigNumber';
+import { buildOptionalOpReturnScript } from '../../src/libs/OP_RETURN';
 
 interface TestUTXO {
   txid: string;
@@ -194,5 +195,38 @@ describe('Dual Endpoint Tests', () => {
     );
     // Even with zero fee rate, there's still a minimum fee calculated, change >= 0
     expect(res1.amount).toBe(feepoolAmountB);
+  });
+
+  test('should append binary payment proof as the last output', async () => {
+    const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
+    const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
+    const totalValue = testData.clientUtxos.reduce((s, u) => s + u.satoshis, 0);
+    const feepoolAmount = totalValue - 500;
+    const proof = Uint8Array.from([0x00, 0x01, 0xff, 0x10, 0x70, 0x61, 0x79, 0x80]);
+
+    const res1 = await buildDualFeePoolBaseTx(
+      testData.clientUtxos,
+      clientPriv,
+      serverPriv.toPublicKey(),
+      feepoolAmount,
+      testData.feeRate,
+    );
+
+    const res2 = await buildDualFeePoolSpendTXWithProof(
+      res1.tx,
+      res1.amount,
+      100,
+      testData.endHeight,
+      clientPriv,
+      serverPriv.toPublicKey(),
+      testData.feeRate,
+      proof,
+    );
+
+    expect(res2.tx.outputs.length).toBe(3);
+    expect(res2.tx.outputs[0].satoshis).toBe(100);
+    expect(res2.tx.outputs[1].satoshis).toBe(res2.amount);
+    expect(res2.tx.outputs[2].satoshis).toBe(0);
+    expect(res2.tx.outputs[2].lockingScript.toHex()).toBe(buildOptionalOpReturnScript(proof)!.toHex());
   });
 });

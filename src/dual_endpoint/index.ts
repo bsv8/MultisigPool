@@ -22,8 +22,10 @@ export {
 export {  
   createFakeDualMultisigUnlockScript,
   subBuildDualFeePoolSpendTX,
+  subBuildDualFeePoolSpendTXWithProof,
   spendTXDualFeePoolClientSign,
   buildDualFeePoolSpendTX,
+  buildDualFeePoolSpendTXWithProof,
 } from './2client_spend_tx';
 
 export {

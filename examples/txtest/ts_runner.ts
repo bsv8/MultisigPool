@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PrivateKey, PublicKey } from '@bsv/sdk/primitives';
+import { PrivateKey } from '@bsv/sdk/primitives';
 import { buildDualFeePoolBaseTx } from '../../src/dual_endpoint/1base_tx';
 import { buildDualFeePoolSpendTX } from '../../src/dual_endpoint/2client_spend_tx';
 import * as base from '../../src/dual_endpoint/1base_tx';

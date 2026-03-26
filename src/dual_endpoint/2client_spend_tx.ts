@@ -13,6 +13,7 @@ import { hash256 } from '@bsv/sdk/primitives/Hash';
 import * as ECDSA from '@bsv/sdk/primitives/ECDSA';
 import BigNumber from '@bsv/sdk/primitives/BigNumber';
 import { createDualMultisigScript, createP2PKHScript } from './1base_tx';
+import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
 // const SigHash = {
@@ -83,6 +84,7 @@ interface DualSpendTxResponse {
 		clientPrivateKey: PrivateKey,
 		serverPublicKey: PublicKey,
 		feeRate: number,
+		paymentProof?: OpReturnPayload | null,
 	): Promise<BuildDualSpendTxResponse> {
 		const clientPublicKey = clientPrivateKey.toPublicKey();
 		const clientAddress = clientPublicKey.toAddress();
@@ -124,6 +126,17 @@ interface DualSpendTxResponse {
 			lockingScript: clientLockingScript,
 			satoshis: totalAmount - serverAmount
 		});
+
+		// 付款证明放在最后一个输出，保持前两个金额输出位置稳定，便于旧更新流程继续工作。
+		const opReturnScript = buildOptionalOpReturnScript(paymentProof);
+		if (opReturnScript) {
+			const opReturnLockingScript = new LockingScript();
+			opReturnLockingScript.chunks = opReturnScript.chunks;
+			tx.addOutput({
+				lockingScript: opReturnLockingScript,
+				satoshis: 0
+			});
+		}
 
 		// 创建假的解锁脚本来估算交易大小
 		const fakeUnlockScript = createFakeDualMultisigUnlockScript();
@@ -236,6 +249,7 @@ interface DualSpendTxResponse {
 		clientPrivateKey: PrivateKey,
 		serverPublicKey: PublicKey,
 		feeRate: number,
+		paymentProof?: OpReturnPayload | null,
 	): Promise<DualSpendTxResponse> {
 		try {
 			// 构建交易
@@ -246,7 +260,8 @@ interface DualSpendTxResponse {
 				endHeight,
 				clientPrivateKey,
 				serverPublicKey,
-				feeRate
+				feeRate,
+				paymentProof
 			);
 
 			console.log('BuildOneB success');
@@ -268,5 +283,49 @@ interface DualSpendTxResponse {
 			console.error('BuildDualFeePoolSpendTX error:', error);
 			throw error;
 		}
+	}
+
+	export async function subBuildDualFeePoolSpendTXWithProof(
+		prevTxId: string,
+		totalAmount: number,
+		serverAmount: number,
+		endHeight: number,
+		clientPrivateKey: PrivateKey,
+		serverPublicKey: PublicKey,
+		feeRate: number,
+		paymentProof?: OpReturnPayload | null,
+	): Promise<BuildDualSpendTxResponse> {
+		return subBuildDualFeePoolSpendTX(
+			prevTxId,
+			totalAmount,
+			serverAmount,
+			endHeight,
+			clientPrivateKey,
+			serverPublicKey,
+			feeRate,
+			paymentProof
+		);
+	}
+
+	export async function buildDualFeePoolSpendTXWithProof(
+		aTx: Transaction,
+		totalAmount: number,
+		serverAmount: number,
+		endHeight: number,
+		clientPrivateKey: PrivateKey,
+		serverPublicKey: PublicKey,
+		feeRate: number,
+		paymentProof?: OpReturnPayload | null,
+	): Promise<DualSpendTxResponse> {
+		return buildDualFeePoolSpendTX(
+			aTx,
+			totalAmount,
+			serverAmount,
+			endHeight,
+			clientPrivateKey,
+			serverPublicKey,
+			feeRate,
+			paymentProof
+		);
 	}
 // }

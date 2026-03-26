@@ -1,0 +1,33 @@
+{
+  "paymentProofHex": "0001ff107061796d656e742d70726f6f662d7f80",
+  "dual": {
+    "clientPrivHex": "903b1b2c396f17203fa83444d72bf5c666119d9d681eb715520f99ae6f92322c",
+    "serverPrivHex": "a2d2ca4c19e3c560792ca751842c29b9da94be09f712a7f9ba7c66e64a354829",
+    "clientUtxos": [
+      {
+        "txid": "0a1fd93f02e68d1a73fb499e948ee83a78aa9337e1476bd89f7092a7ef16a050",
+        "vout": 1,
+        "satoshis": 99902
+      }
+    ],
+    "endHeight": 800000,
+    "feeRate": 0.5,
+    "isMain": false,
+    "serverAmount": 100,
+    "feepoolAmount": 99402
+  },
+  "triple": {
+    "clientPrivHex": "a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c",
+    "serverPrivHex": "903b1b2c396f17203fa83444d72bf5c666119d9d681eb715520f99ae6f92322c",
+    "escrowPrivHex": "a2d2ca4c19e3c560792ca751842c29b9da94be09f712a7f9ba7c66e64a354829",
+    "clientUtxos": [
+      {
+        "txid": "ffcfe296a596f01e5cef2d14f39bc61f55c8f0535a5f723c1b5b043b77053595",
+        "vout": 1,
+        "satoshis": 19996
+      }
+    ],
+    "feeRate": 1.2,
+    "isMain": false
+  }
+}
