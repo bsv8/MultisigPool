@@ -11,7 +11,7 @@ func TestTripleEndpointBasicFunctionality(t *testing.T) {
 		// and dependencies that match the current codebase structure
 		t.Log("Triple endpoint package test placeholder")
 	})
-	
+
 	// TODO: Add comprehensive tests once the function signatures are stabilized
 	// The current codebase has complex dependencies and the function signatures
 	// need to be verified against the actual implementation

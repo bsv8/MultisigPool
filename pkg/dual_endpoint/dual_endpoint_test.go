@@ -11,7 +11,7 @@ func TestDualEndpointBasicFunctionality(t *testing.T) {
 		// and dependencies that match the current codebase structure
 		t.Log("Dual endpoint package test placeholder")
 	})
-	
+
 	// TODO: Add comprehensive tests once the function signatures are stabilized
 	// The current codebase has complex dependencies and the function signatures
 	// don't match the expected test patterns from the examples

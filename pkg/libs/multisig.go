@@ -79,20 +79,16 @@ func (ms *MultiSig) Sign(tx *transaction.Transaction, inputIndex uint32) (*scrip
 		return nil, transaction.ErrEmptyPreviousTx
 	}
 
-
 	preimage, _ := tx.CalcInputPreimage(inputIndex, *ms.SigHashFlag)
-
 
 	if len(preimage) >= 68 {
 		hashPrevouts := preimage[4:36]
 		hashSequence := preimage[36:68]
 		// hashOutputs is located 40 bytes from the end (4 locktime + 4 sighash flag + 32 hashOutputs)
 		hashOutputs := preimage[len(preimage)-40-32 : len(preimage)-40]
-	_ = hashPrevouts
-	_ = hashSequence
-	_ = hashOutputs
-
-
+		_ = hashPrevouts
+		_ = hashSequence
+		_ = hashOutputs
 
 	}
 
@@ -133,20 +129,16 @@ func (ms *MultiSig) SignOne(tx *transaction.Transaction, inputIndex uint32, priv
 		return nil, transaction.ErrEmptyPreviousTx
 	}
 
-
 	preimage, _ := tx.CalcInputPreimage(inputIndex, *ms.SigHashFlag)
-
 
 	if len(preimage) >= 68 {
 		hashPrevouts := preimage[4:36]
 		hashSequence := preimage[36:68]
 		// hashOutputs is located 40 bytes from the end (4 locktime + 4 sighash flag + 32 hashOutputs)
 		hashOutputs := preimage[len(preimage)-40-32 : len(preimage)-40]
-	_ = hashPrevouts
-	_ = hashSequence
-	_ = hashOutputs
-
-
+		_ = hashPrevouts
+		_ = hashSequence
+		_ = hashOutputs
 
 	}
 
