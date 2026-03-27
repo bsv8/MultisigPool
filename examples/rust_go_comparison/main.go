@@ -69,7 +69,8 @@ func loadFixture() Fixture {
 }
 
 func main() {
-	fmt.Println("=== Golang Cross-Validation Runner ===\n")
+	fmt.Println("=== Golang Cross-Validation Runner ===")
+	fmt.Println()
 
 	f := loadFixture()
 
