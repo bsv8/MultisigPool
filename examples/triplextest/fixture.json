@@ -9,5 +9,13 @@
       "satoshis": 19996
     }
   ],
-  "feePerByte": 1.2
+  "feePerByte": 1.2,
+  "endHeight": 0,
+  "isMain": false,
+  "arbitration": {
+    "sequenceNumber": 9,
+    "sellerAmount": 1111,
+    "arbiterFee": 333,
+    "proofHex": "6172622d70726f6f66"
+  }
 }

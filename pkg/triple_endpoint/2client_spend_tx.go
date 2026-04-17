@@ -103,7 +103,10 @@ func SubBuildTripleFeePoolSpendTXWithProof(
 		return nil, 0, fmt.Errorf("failed to create change locking script: %w", err)
 	}
 
-	// 添加服务器输出
+	// 输出顺序约束（基础交易）：
+	// - output[0] 固定给 B（收钱/供给方）；
+	// - output[1] 固定给 A（找零/出钱方）；
+	// 仲裁交易在此基础上固定追加 output[2]=arbiter_fee，output[3]=OP_RETURN（可选）。
 	transactionTwo.AddOutput(&tx.TransactionOutput{
 		Satoshis:      0,
 		LockingScript: serverChangeScript,

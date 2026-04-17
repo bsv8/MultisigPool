@@ -2,12 +2,15 @@ import { PrivateKey, PublicKey } from '@bsv/sdk/primitives';
 // import Script from '@bsv/sdk/script/Script';
 import Transaction from '@bsv/sdk/transaction/Transaction';
 import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
+import LockingScript from '@bsv/sdk/script/LockingScript';
 // import { BaseChain } from '../tx/BaseChain';
 // import { TripleEndpointPool_3server_sign } from './triple_endpoint_pool_3server_sign';
 // import OP from '@bsv/sdk/script/OP';
 // import LockingScript from '@bsv/sdk/script/LockingScript';
 // import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 import MultiSig from '../libs/MULTISIG';
+import P2PKH from '../libs/P2PKH';
+import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
 const SigHash = {
@@ -101,6 +104,60 @@ const SigHash = {
 		} catch (error) {
 			throw new Error(`加载交易失败: ${error}`);
 		}
+	}
+
+	// 仲裁更新固定输出顺序：
+	// output[0]=B, output[1]=A, output[2]=arbiter_fee, output[3]=OP_RETURN(可选)。
+	export async function tripleFeePoolLoadArbitrationTx(
+		bTx: Transaction,
+		serverPublicKey: PublicKey,
+		aPublicKey: PublicKey,
+		bPublicKey: PublicKey,
+		targetAmount: number,
+		arbiterFee: number,
+		locktime?: number,
+		sequenceNumber: number = 0xffffffff,
+		serverAmount: number = 0,
+		paymentProof?: OpReturnPayload | null,
+	): Promise<Transaction> {
+		const tx = await tripleFeePoolLoadTx(
+			bTx,
+			serverPublicKey,
+			aPublicKey,
+			bPublicKey,
+			targetAmount,
+			locktime,
+			sequenceNumber,
+			serverAmount,
+		);
+		const allAmount = (tx.outputs[0].satoshis || 0) + (tx.outputs[1].satoshis || 0);
+		if (serverAmount + arbiterFee > allAmount) {
+			throw new Error('pool_insufficient');
+		}
+		tx.outputs[0].satoshis = serverAmount;
+		tx.outputs[1].satoshis = allAmount - serverAmount - arbiterFee;
+		const arbiterLock = new P2PKH().lock(serverPublicKey);
+		const arbiterOutput = { lockingScript: arbiterLock, satoshis: arbiterFee };
+		if (tx.outputs.length >= 3) {
+			tx.outputs[2] = arbiterOutput as any;
+		} else {
+			tx.addOutput(arbiterOutput);
+		}
+		const opReturn = buildOptionalOpReturnScript(paymentProof);
+		if (opReturn) {
+			const opLock = new LockingScript();
+			opLock.chunks = opReturn.chunks;
+			const opOutput = { lockingScript: opLock, satoshis: 0 };
+			if (tx.outputs.length >= 4) {
+				tx.outputs[3] = opOutput as any;
+			} else {
+				tx.addOutput(opOutput);
+			}
+		}
+		if (tx.outputs.length > 4) {
+			tx.outputs = tx.outputs.slice(0, 4);
+		}
+		return tx;
 	}
 
 	/**

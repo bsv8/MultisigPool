@@ -27,7 +27,9 @@ func capture(cmd *exec.Cmd) ([]string, error) {
 }
 
 func main() {
-	goHex, err := capture(exec.Command("go", "run", "go_runner/main.go"))
+	goBin := "/home/david/.gvm/gos/go1.26.0/bin/go"
+
+	goHex, err := capture(exec.Command(goBin, "run", "examples/txtest/go_runner/main.go"))
 	if err != nil {
 		fmt.Printf("Run go_runner failed: %v\n", err)
 		return
@@ -38,7 +40,7 @@ func main() {
 	fmt.Println("Go Step4Hex", goHex[3])
 	fmt.Println("Go Step5Hex", goHex[4])
 
-	tsHex, err := capture(exec.Command("npx", "tsx", "ts_runner.ts"))
+	tsHex, err := capture(exec.Command("npx", "tsx", "examples/txtest/ts_runner.ts"))
 	if err != nil {
 		fmt.Printf("Run ts_runner failed: %v\n", err)
 		return

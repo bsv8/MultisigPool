@@ -41,7 +41,7 @@ import MultiSig from '../libs/MULTISIG';
 	 * @param bPrivateKey B方私钥（服务器私钥）
 	 * @returns B方签名字节
 	 */
-	export async function tripleClientBFeePoolSpendTXUpdateSign(
+export async function tripleClientBFeePoolSpendTXUpdateSign(
 		tx: Transaction,
 		serverPublicKey: PublicKey,
 		aPublicKey: PublicKey,
@@ -84,6 +84,35 @@ import MultiSig from '../libs/MULTISIG';
 			return clientBSignBytes;
 		} catch (error) {
 			throw new Error(`客户端B方签名失败: ${error}`);
+		}
+	}
+
+	// tripleServerFeePoolSpendTXUpdateSign 由仲裁者（server）对仲裁更新交易签名。
+	// 对齐 Go: ServerTripleFeePoolSpendTXUpdateSign。
+	export async function tripleServerFeePoolSpendTXUpdateSign(
+		tx: Transaction,
+		serverPrivateKey: PrivateKey,
+		aPublicKey: PublicKey,
+		bPublicKey: PublicKey
+	): Promise<Buffer> {
+		try {
+			const serverPublicKey = serverPrivateKey.toPublicKey();
+			if (!tx.inputs[0].sourceTransaction || !tx.inputs[0].sourceTransaction.outputs[0]) {
+				throw new Error('missing source output context for signing');
+			}
+			const redeem = new MultiSig().lock([serverPublicKey, aPublicKey, bPublicKey], 2);
+			tx.inputs[0].sourceTransaction.outputs[0] = {
+				satoshis: tx.inputs[0].sourceTransaction.outputs[0].satoshis,
+				lockingScript: redeem,
+			} as any;
+			return new MultiSig().signOne(
+				tx,
+				0,
+				serverPrivateKey,
+				TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
+			);
+		} catch (error) {
+			throw new Error(`server update signing failed: ${error}`);
 		}
 	}
 

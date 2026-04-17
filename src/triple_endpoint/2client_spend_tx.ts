@@ -13,6 +13,7 @@ import LockingScript from '@bsv/sdk/script/LockingScript';
 import MultiSig from '../libs/MULTISIG';
 import P2PKH from '../libs/P2PKH';
 import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
+import { estimateSerializedTxSize } from '../libs/TX_SIZE';
 // import unlock from 'lucide-svelte/icons/unlock';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
@@ -118,7 +119,7 @@ interface TripleSpendTxResponse {
       }
       
       // 计算交易大小和费用
-      const txSize = tx.toBinary().length;
+      const txSize = estimateSerializedTxSize(tx);
       let fee = Math.floor((txSize / 1000.0) * feeRate);
       
       if (serverValue < fee) {

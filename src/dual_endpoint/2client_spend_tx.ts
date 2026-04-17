@@ -8,12 +8,10 @@ import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
 import OP from '@bsv/sdk/script/OP';
 import LockingScript from '@bsv/sdk/script/LockingScript';
 import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
-import { fromBase58Check } from '@bsv/sdk/primitives/utils';
-import { hash256 } from '@bsv/sdk/primitives/Hash';
-import * as ECDSA from '@bsv/sdk/primitives/ECDSA';
-import BigNumber from '@bsv/sdk/primitives/BigNumber';
 import { createDualMultisigScript, createP2PKHScript } from './1base_tx';
 import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
+import MultiSig from '../libs/MULTISIG';
+import { estimateSerializedTxSize } from '../libs/TX_SIZE';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
 // const SigHash = {
@@ -94,9 +92,6 @@ interface DualSpendTxResponse {
 		const tx = new Transaction();
 		tx.lockTime = endHeight;
 
-		// 创建前一个交易的双端多签锁定脚本
-		const prevMultisigScript = createDualMultisigScript([serverPublicKey, clientPublicKey]);
-
 		// 添加输入（双端多签 UTXO）
 		tx.addInput({
 			sourceTXID: prevTxId,
@@ -143,8 +138,8 @@ interface DualSpendTxResponse {
 		tx.inputs[0].unlockingScript = new UnlockingScript();
 		tx.inputs[0].unlockingScript.chunks = fakeUnlockScript.chunks;
 
-		// 计算交易大小和费用
-		const txSize = tx.toBinary().length;
+		// 计算交易大小和费用（使用副本估算，避免污染交易缓存）
+		const txSize = estimateSerializedTxSize(tx);
 		let fee = Math.floor((txSize / 1000.0) * feeRate);
 
 		if (totalAmount < serverAmount + fee) {
@@ -176,7 +171,7 @@ interface DualSpendTxResponse {
 	 * @param serverPublicKey 服务器公钥
 	 * @returns 客户端签名字节
 	 */
-	export async function spendTXDualFeePoolClientSign(
+export async function spendTXDualFeePoolClientSign(
 		bTx: Transaction,
 		totalAmount: number,
 		clientPrivKey: PrivateKey,
@@ -202,31 +197,14 @@ interface DualSpendTxResponse {
 			lockingScript: priorityLockingScript
 		};
 
-		// 创建签名哈希数据
-		const sighashData = TransactionSignature.format({
-			sourceTXID: bTx.inputs[0].sourceTXID || '',
-			sourceOutputIndex: bTx.inputs[0].sourceOutputIndex,
-			sourceSatoshis: totalAmount,
-			transactionVersion: bTx.version,
-			otherInputs: [],
-			outputs: bTx.outputs,
-			inputIndex: 0,
-			subscript: priorityScript,
-			inputSequence: bTx.inputs[0].sequence || 1,
-			lockTime: bTx.lockTime,
-			scope: TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
-		});
+		const clientSignBytes = new MultiSig().signOne(
+			bTx,
+			0,
+			clientPrivKey,
+			TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
+		);
 
-		// 生成双 SHA256 哈希
-        const msgHash = hash256(sighashData);
-        // 客户端确定性签名（RFC6979）
-        const clientSignature = ECDSA.sign(new BigNumber(msgHash, 16), clientPrivKey, true);
-
-        // 构造客户端签名字节（包含sighash标志）
-        const clientSignatureDER = clientSignature.toDER() as number[];
-		const clientSignBytes = [...clientSignatureDER, TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID];
-
-		return clientSignBytes;
+		return Array.from(clientSignBytes);
 	}
 
 	/**

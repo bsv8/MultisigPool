@@ -91,4 +91,133 @@ func TestTripleSpendTxOptionalOpReturn(t *testing.T) {
 			t.Fatalf("ServerVerifyClientASig() error = %v, ok = %v", err, ok)
 		}
 	})
+
+	t.Run("arbitration outputs keep fixed order", func(t *testing.T) {
+		baseResp, err := BuildTripleFeePoolBaseTx(&[]libs.UTXO{
+			{
+				TxID:  "ffcfe296a596f01e5cef2d14f39bc61f55c8f0535a5f723c1b5b043b77053595",
+				Vout:  1,
+				Value: 19996,
+			},
+		}, serverPriv.PubKey(), clientPriv, escrowPriv.PubKey(), false, 1.2)
+		if err != nil {
+			t.Fatalf("BuildTripleFeePoolBaseTx() error = %v", err)
+		}
+		spendTx, _, _, err := BuildTripleFeePoolSpendTX(
+			baseResp.Tx,
+			baseResp.Amount,
+			0,
+			serverPriv.PubKey(),
+			clientPriv,
+			escrowPriv.PubKey(),
+			false,
+			1.2,
+		)
+		if err != nil {
+			t.Fatalf("BuildTripleFeePoolSpendTX() error = %v", err)
+		}
+		sellerAmount := uint64(1111)
+		arbiterFee := uint64(333)
+		proof := []byte("arb-proof")
+		arbTx, err := TripleFeePoolLoadArbitrationTx(
+			spendTx.Hex(),
+			nil,
+			9,
+			sellerAmount,
+			arbiterFee,
+			false,
+			serverPriv.PubKey(),
+			clientPriv.PubKey(),
+			escrowPriv.PubKey(),
+			baseResp.Amount,
+			proof,
+		)
+		if err != nil {
+			t.Fatalf("TripleFeePoolLoadArbitrationTx() error = %v", err)
+		}
+		if got := len(arbTx.Outputs); got != 4 {
+			t.Fatalf("outputs len = %d, want 4", got)
+		}
+		if arbTx.Outputs[0].Satoshis != sellerAmount {
+			t.Fatalf("output[0] = %d, want %d", arbTx.Outputs[0].Satoshis, sellerAmount)
+		}
+		if arbTx.Outputs[2].Satoshis != arbiterFee {
+			t.Fatalf("output[2] = %d, want %d", arbTx.Outputs[2].Satoshis, arbiterFee)
+		}
+		if arbTx.Outputs[3].Satoshis != 0 {
+			t.Fatalf("output[3] satoshis = %d, want 0", arbTx.Outputs[3].Satoshis)
+		}
+		payload := extractTriplePayloadForTest(t, arbTx.Outputs[3].LockingScript)
+		if !bytes.Equal(payload, proof) {
+			t.Fatalf("output[3] payload = %x, want %x", payload, proof)
+		}
+	})
+
+	t.Run("arbitration signed by arbiter and seller then merge", func(t *testing.T) {
+		baseResp, err := BuildTripleFeePoolBaseTx(&[]libs.UTXO{
+			{
+				TxID:  "ffcfe296a596f01e5cef2d14f39bc61f55c8f0535a5f723c1b5b043b77053595",
+				Vout:  1,
+				Value: 19996,
+			},
+		}, serverPriv.PubKey(), clientPriv, escrowPriv.PubKey(), false, 1.2)
+		if err != nil {
+			t.Fatalf("BuildTripleFeePoolBaseTx() error = %v", err)
+		}
+		spendTx, _, _, err := BuildTripleFeePoolSpendTX(
+			baseResp.Tx,
+			baseResp.Amount,
+			0,
+			serverPriv.PubKey(),
+			clientPriv,
+			escrowPriv.PubKey(),
+			false,
+			1.2,
+		)
+		if err != nil {
+			t.Fatalf("BuildTripleFeePoolSpendTX() error = %v", err)
+		}
+		arbTx, err := TripleFeePoolLoadArbitrationTx(
+			spendTx.Hex(),
+			nil,
+			9,
+			1111,
+			333,
+			false,
+			serverPriv.PubKey(),
+			clientPriv.PubKey(),
+			escrowPriv.PubKey(),
+			baseResp.Amount,
+			[]byte("arb-proof"),
+		)
+		if err != nil {
+			t.Fatalf("TripleFeePoolLoadArbitrationTx() error = %v", err)
+		}
+
+		arbiterSig, err := ServerTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv, clientPriv.PubKey(), escrowPriv.PubKey())
+		if err != nil {
+			t.Fatalf("ServerTripleFeePoolSpendTXUpdateSign() error = %v", err)
+		}
+		sellerSig, err := ClientBTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
+		if err != nil {
+			t.Fatalf("ClientBTripleFeePoolSpendTXUpdateSign() error = %v", err)
+		}
+
+		okArbiter, err := ClientVerifyServerSig(arbTx, baseResp.Amount, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv.PubKey(), arbiterSig)
+		if err != nil || !okArbiter {
+			t.Fatalf("ClientVerifyServerSig() error = %v, ok = %v", err, okArbiter)
+		}
+		okSeller, err := ServerVerifyClientBSig(arbTx, baseResp.Amount, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv.PubKey(), sellerSig)
+		if err != nil || !okSeller {
+			t.Fatalf("ServerVerifyClientBSig() error = %v, ok = %v", err, okSeller)
+		}
+
+		finalTx, err := MergeTripleFeePoolSigForSpendTx(arbTx.Hex(), arbiterSig, sellerSig)
+		if err != nil {
+			t.Fatalf("MergeTripleFeePoolSigForSpendTx() error = %v", err)
+		}
+		if finalTx.Inputs[0].UnlockingScript == nil {
+			t.Fatalf("unlocking script should not be nil")
+		}
+	})
 }

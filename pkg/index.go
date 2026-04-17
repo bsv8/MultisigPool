@@ -36,11 +36,13 @@ var (
 	// Triple endpoint functions
 	TripleFeePoolSpentScript        = triple.TripleFeePoolSpentScript
 	MergeTripleFeePoolSigForSpendTx = triple.MergeTripleFeePoolSigForSpendTx
+	TripleFeePoolLoadArbitrationTx  = triple.TripleFeePoolLoadArbitrationTx
 	VerifySignature                 = triple.VerifySignature
 	// Triple endpoint verify helpers
-	ServerVerifyClientASig = triple.ServerVerifyClientASig
-	ServerVerifyClientBSig = triple.ServerVerifyClientBSig
-	ClientVerifyServerSig  = triple.ClientVerifyServerSig
+	ServerVerifyClientASig               = triple.ServerVerifyClientASig
+	ServerVerifyClientBSig               = triple.ServerVerifyClientBSig
+	ClientVerifyServerSig                = triple.ClientVerifyServerSig
+	ServerTripleFeePoolSpendTXUpdateSign = triple.ServerTripleFeePoolSpendTXUpdateSign
 )
 
 // Common errors

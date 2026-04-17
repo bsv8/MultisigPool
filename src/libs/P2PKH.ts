@@ -15,8 +15,8 @@ import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature'
 import { hash256 } from '@bsv/sdk/primitives/Hash'
 import Script from '@bsv/sdk/script/Script'
 import PublicKey from '@bsv/sdk/primitives/PublicKey'
-import * as ECDSA from '@bsv/sdk/primitives/ECDSA'
 import BigNumber from '@bsv/sdk/primitives/BigNumber'
+import { signGoCompatible } from '../crypto/go_rfc6979'
 
 function verifyTruthy<T>(v: T | undefined): T {
   if (v == null) throw new Error('must have value')
@@ -120,11 +120,13 @@ export default class P2PKH implements ScriptTemplate {
           scope: signatureScope
         })
 
-        const msgHash = hash256(preimage);
-        const rawSignature = ECDSA.sign(new BigNumber(msgHash, 16), privateKey, true);
+        const msgHash = hash256(preimage)
+        const privateKeyHex = privateKey.toString(16).padStart(64, '0')
+        const sighashHex = Buffer.from(msgHash).toString('hex')
+        const goSig = signGoCompatible(privateKeyHex, sighashHex)
         const sig = new TransactionSignature(
-          rawSignature.r,
-          rawSignature.s,
+          new BigNumber(goSig.r, 16),
+          new BigNumber(goSig.s, 16),
           signatureScope
         )
         const sigForScript = sig.toChecksigFormat()

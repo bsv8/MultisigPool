@@ -94,8 +94,15 @@ const SigHash = {
 		bSignBytes: Buffer
 	): Transaction {
 		try {
-			// 从 hex 恢复交易
-			// const tx = Transaction.fromHex(txHex);
+			// 用新交易壳复制一份，避免原对象已缓存旧序列化内容导致 toHex 不更新。
+			const mergedTx = new Transaction(
+				tx.version,
+				tx.inputs.map((input) => ({ ...input })),
+				tx.outputs.map((output) => ({ ...output })),
+				tx.lockTime,
+				tx.metadata,
+				tx.merklePath
+			);
 
 			// 创建多签解锁脚本
 			const unlockScript = new Script([]);
@@ -109,10 +116,10 @@ const SigHash = {
 			unlockScript.writeBin(Array.from(bSignBytes));
 
 			// 设置解锁脚本
-			tx.inputs[0].unlockingScript = new UnlockingScript();
-			tx.inputs[0].unlockingScript.chunks = unlockScript.chunks;
+			mergedTx.inputs[0].unlockingScript = new UnlockingScript();
+			mergedTx.inputs[0].unlockingScript.chunks = unlockScript.chunks;
 	
-			return tx;
+			return mergedTx;
 		} catch (error) {
 			throw new Error(`合并签名失败: ${error}`);
 		}

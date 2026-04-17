@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,6 +24,12 @@ type Fixture struct {
 	FeeRate       float64     `json:"feePerByte"`
 	IsMain        bool        `json:"isMain"`
 	ChangeAddress string      `json:"changeAddress"` // not used currently
+	Arbitration   struct {
+		SequenceNumber uint32 `json:"sequenceNumber"`
+		SellerAmount   uint64 `json:"sellerAmount"`
+		ArbiterFee     uint64 `json:"arbiterFee"`
+		ProofHex       string `json:"proofHex"`
+	} `json:"arbitration"`
 }
 
 func loadFixture() Fixture {
@@ -81,64 +88,65 @@ func main() {
 
 	fmt.Printf("Step1Hex: %s\n", step1.Tx.String())
 
-	// Step2: Client constructs spend TX and provides its signature
+	// Step2: A(买方)构建花费交易并签名
 	tx2, clientSignBytes, amount, err := te.BuildTripleFeePoolSpendTX(step1.Tx, step1.Amount, f.EndHeight, serverPriv.PubKey(), clientPriv, escrowPriv.PubKey(), f.IsMain, f.FeeRate)
 	if err != nil {
 		log.Fatalf("step2: %v", err)
 	}
 
-	fmt.Printf("Step2Hex: %s\n", tx2.String())
-
-	// Step3: Server signs to finalize
+	// Step3: B(卖方)签名
 	serverSignBytes, err := te.SpendTXTripleFeePoolBSign(tx2, step1.Amount, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
 	if err != nil {
 		log.Fatalf("step3 server sign: %v", err)
 	}
 
-	// Build final unlocking script with both signatures
-	// signs := [][]byte{*clientSignBytes, *serverSignBytes}
-	// unlockScript, err := libs.BuildSignScript(&signs)
-	// if err != nil {
-	//     log.Fatalf("build unlock script: %v", err)
-	// }
-	// tx2.Inputs[0].UnlockingScript = unlockScript
-
-	// fmt.Printf("Step3Hex: %s\n", tx2.String())
-
-	// // Output new UTXO belonging to client (output[1])
-	// newUtxo := libs.UTXO{
-	//     TxID:  tx2.TxID().String(),
-	//     Vout:  1,
-	//     Value: amount,
-	// }
-	// saveNewUTXO(newUtxo)
-
 	// Print signatures hex for debugging
-	fmt.Printf("ClientSig: %x\n", *clientSignBytes)
-	fmt.Printf("ServerSig: %x\n", *serverSignBytes)
+	fmt.Printf("BuyerSig: %x\n", *clientSignBytes)
+	fmt.Printf("SellerSig: %x\n", *serverSignBytes)
 
-	// Step4: Client update and re-sign
-	const newServerAmount uint64 = 150 // 修改服务器金额
-	const newSequenceNumber uint32 = 2 // 修改序列号
-
-	updatedTx, err := te.TripleFeePoolLoadTx(tx2.String(), nil, newSequenceNumber, newServerAmount, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv.PubKey(), step1.Amount)
+	// Step4: 进入仲裁更新交易（卖方金额 + 仲裁费 + 证据 OP_RETURN）
+	proofBytes, err := hex.DecodeString(f.Arbitration.ProofHex)
 	if err != nil {
-		log.Fatalf("step4 load tx: %v", err)
+		log.Fatalf("decode proof hex: %v", err)
 	}
-
-	clientUpdateSignBytes, err := te.ClientATripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv.PubKey(), clientPriv, escrowPriv.PubKey())
+	arbTx, err := te.TripleFeePoolLoadArbitrationTx(
+		tx2.String(),
+		nil,
+		f.Arbitration.SequenceNumber,
+		f.Arbitration.SellerAmount,
+		f.Arbitration.ArbiterFee,
+		f.IsMain,
+		serverPriv.PubKey(),
+		clientPriv.PubKey(),
+		escrowPriv.PubKey(),
+		step1.Amount,
+		proofBytes,
+	)
 	if err != nil {
-		log.Fatalf("step4 client sign: %v", err)
+		log.Fatalf("step4 load arbitration tx: %v", err)
 	}
+	fmt.Printf("ArbitrationTxHex: %s\n", arbTx.String())
 
-	fmt.Printf("ClientUpdateSig: %x\n", *clientUpdateSignBytes)
-
-	// Step5: Server update sign
-	serverUpdateSignBytes, err := te.ClientBTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
+	// Step5: 仲裁者签名（server）
+	arbiterSig, err := te.ServerTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv, clientPriv.PubKey(), escrowPriv.PubKey())
 	if err != nil {
-		log.Fatalf("step5 server sign: %v", err)
+		log.Fatalf("step5 arbiter sign: %v", err)
 	}
+	fmt.Printf("ArbiterSig: %x\n", *arbiterSig)
 
-	fmt.Printf("ServerUpdateSig: %x\n", *serverUpdateSignBytes)
+	// Step6: 卖方确认手续费后签名（不认可则业务层直接放弃，不广播）
+	sellerArbSig, err := te.ClientBTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
+	if err != nil {
+		log.Fatalf("step6 seller sign: %v", err)
+	}
+	fmt.Printf("SellerArbSig: %x\n", *sellerArbSig)
+
+	// Step7: 合成最终可广播交易（仲裁者签名 + 卖方签名）
+	finalTx, err := te.MergeTripleFeePoolSigForSpendTx(arbTx.String(), arbiterSig, sellerArbSig)
+	if err != nil {
+		log.Fatalf("step7 merge sign: %v", err)
+	}
+	fmt.Printf("FinalArbitrationHex: %s\n", finalTx.String())
+
 	_ = amount
 }

@@ -2,15 +2,13 @@ import { PrivateKey, PublicKey } from '@bsv/sdk/primitives';
 import Script from '@bsv/sdk/script/Script';
 import Transaction from '@bsv/sdk/transaction/Transaction';
 import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
-import { hash256 } from '@bsv/sdk/primitives/Hash';
-import * as ECDSA from '@bsv/sdk/primitives/ECDSA';
-import BigNumber from '@bsv/sdk/primitives/BigNumber';
 // import { BaseChain } from '../tx/BaseChain';
 import type { UTXO, BuildDualFeePoolBaseTxResponse } from '../types';
 // import { API } from '../2api/api';
 import OP from '@bsv/sdk/script/OP';
 import LockingScript from '@bsv/sdk/script/LockingScript';
-import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
+import P2PKH from '../libs/P2PKH';
+import { estimateSerializedTxSize } from '../libs/TX_SIZE';
 // import { TripleEndpointPool } from '../triple_endpoint';
 
 // 定义 SigHash 常量，与 Go SDK 保持一致
@@ -107,7 +105,7 @@ import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 	 * @param feeRate 费率（sat/byte）
 	 * @returns 构建的交易、金额和输出索引
 	 */
-	export async function buildDualFeePoolBaseTx(
+export async function buildDualFeePoolBaseTx(
 		clientUtxos: UTXO[],
 		clientPrivateKey: PrivateKey,
 		serverPublicKey: PublicKey,
@@ -128,14 +126,22 @@ import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 
 		// 创建交易对象
 		const tx = new Transaction();
+		const sigHashType = TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID;
+		const sourceP2PKH = new P2PKH().lock(clientPublicKey);
 
 		// 添加客户端 UTXOs 作为输入
 		let totalValue = 0;
 		for (const utxo of clientUtxos) {
+			const p2pkhUnlock = new P2PKH().unlock(
+				clientPrivateKey,
+				sigHashType,
+				utxo.satoshis,
+				sourceP2PKH
+			);
 			tx.addInput({
 				sourceTXID: utxo.txid,
 				sourceOutputIndex: utxo.vout,
-				unlockingScript: new UnlockingScript(), // 临时的，后续会替换
+				unlockingScriptTemplate: p2pkhUnlock,
 				sequence: 0xffffffff
 			});
 			totalValue += utxo.satoshis;
@@ -160,7 +166,6 @@ import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 
 		// 添加找零输出（先不扣手续费，用于估算大小）
 		const changeLockingScript = new LockingScript();
-		const sourceP2PKH = await createP2PKHScript(clientAddress);
 		changeLockingScript.chunks = sourceP2PKH.chunks;
 		const initialChange = Math.max(0, totalValue - feepoolAmount);
 		tx.addOutput({
@@ -168,70 +173,14 @@ import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 			satoshis: initialChange
 		});
 
-		// 为每个输入创建签名，以便正确估计交易大小
+		// 为每个输入签名，以便正确估计交易大小
 		for (let i = 0; i < tx.inputs.length; i++) {
-			const utxo = clientUtxos[i];
-
-			// 创建 P2PKH 解锁脚本
-			const p2pkhScript = new Script([]);
-
-			// 创建源交易输出信息
-			if (!tx.inputs[i].sourceTransaction) {
-				tx.inputs[i].sourceTransaction = new Transaction();
-				tx.inputs[i].sourceTransaction!.outputs = [];
-			}
-
-			// 创建源输出的 P2PKH 锁定脚本
-			const sourceLockingScript = await createP2PKHScript(clientAddress);
-			const sourceP2PKHLocking = new LockingScript();
-			sourceP2PKHLocking.chunks = sourceLockingScript.chunks;
-
-			// 确保输出数组有足够的长度
-			while (tx.inputs[i].sourceTransaction!.outputs.length <= utxo.vout) {
-				tx.inputs[i].sourceTransaction!.outputs.push({
-					satoshis: 0,
-					lockingScript: new LockingScript()
-				});
-			}
-
-			tx.inputs[i].sourceTransaction!.outputs[utxo.vout] = {
-				satoshis: utxo.satoshis,
-				lockingScript: sourceP2PKHLocking
-			};
-
-			// 创建签名哈希数据
-			const sighashData = TransactionSignature.format({
-				sourceTXID: utxo.txid,
-				sourceOutputIndex: utxo.vout,
-				sourceSatoshis: utxo.satoshis,
-				transactionVersion: tx.version,
-				otherInputs: tx.inputs.filter((_, idx) => idx !== i),
-				outputs: tx.outputs,
-				inputIndex: i,
-				subscript: sourceLockingScript,
-				inputSequence: tx.inputs[i].sequence || 0xffffffff,
-				lockTime: tx.lockTime,
-				scope: TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
-			});
-
-			// 客户端签名（双SHA256后，避免再次哈希）
-			const msgHash = hash256(sighashData);
-			const signature = ECDSA.sign(new BigNumber(msgHash, 16), clientPrivateKey, true);
-
-			// 构造 P2PKH 解锁脚本
-			const signatureDER = signature.toDER() as number[];
-			const signatureBytes = [...signatureDER, TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID];
-
-			p2pkhScript.writeBin(signatureBytes);
-			p2pkhScript.writeBin(clientPublicKey.toDER() as number[]);
-
-			// 设置解锁脚本
-			tx.inputs[i].unlockingScript = new UnlockingScript();
-			tx.inputs[i].unlockingScript!.chunks = p2pkhScript.chunks;
+			const unlockingScript = await tx.inputs[i].unlockingScriptTemplate!.sign(tx, i);
+			tx.inputs[i].unlockingScript = unlockingScript;
 		}
 
 		// 计算交易大小和费用
-		const txSize = tx.toBinary().length;
+		const txSize = estimateSerializedTxSize(tx);
 		let fee = Math.floor((txSize / 1000.0) * feeRate);
 		if (fee === 0) {
 			fee = 1; // 最低手续费为 1 satoshi
@@ -249,43 +198,8 @@ import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 
 		// 重新签名所有输入（因为输出金额变化了）
 		for (let i = 0; i < tx.inputs.length; i++) {
-			const utxo = clientUtxos[i];
-
-			// 创建 P2PKH 解锁脚本
-			const p2pkhScript = new Script([]);
-
-			// 获取源锁定脚本
-			const sourceLockingScript = await createP2PKHScript(clientAddress);
-
-			// 重新创建签名哈希数据
-			const sighashData = TransactionSignature.format({
-				sourceTXID: utxo.txid,
-				sourceOutputIndex: utxo.vout,
-				sourceSatoshis: utxo.satoshis,
-				transactionVersion: tx.version,
-				otherInputs: tx.inputs.filter((_, idx) => idx !== i),
-				outputs: tx.outputs,
-				inputIndex: i,
-				subscript: sourceLockingScript,
-				inputSequence: tx.inputs[i].sequence || 0xffffffff,
-				lockTime: tx.lockTime,
-				scope: TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
-			});
-
-			// 重新签名
-			const msgHash2 = hash256(sighashData);
-			const signature = ECDSA.sign(new BigNumber(msgHash2, 16), clientPrivateKey, true);
-
-			// 构造 P2PKH 解锁脚本
-			const signatureDER = signature.toDER() as number[];
-			const signatureBytes = [...signatureDER, TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID];
-
-			p2pkhScript.writeBin(signatureBytes);
-			p2pkhScript.writeBin(clientPublicKey.toDER() as number[]);
-
-			// 更新解锁脚本
-			tx.inputs[i].unlockingScript = new UnlockingScript();
-			tx.inputs[i].unlockingScript!.chunks = p2pkhScript.chunks;
+			const unlockingScript = await tx.inputs[i].unlockingScriptTemplate!.sign(tx, i);
+			tx.inputs[i].unlockingScript = unlockingScript;
 		}
 
 		const finalAmount = feepoolAmount;

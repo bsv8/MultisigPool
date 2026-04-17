@@ -10,6 +10,7 @@ import type { UTXO, BuildDualFeePoolBaseTxResponse } from '../types';
 // import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 import MultiSig from '../libs/MULTISIG';
 import P2PKH from '../libs/P2PKH';
+import { estimateSerializedTxSize } from '../libs/TX_SIZE';
 // import type { ApiConstructorParams } from '../2api/1base-api';
 // import type { BaseService } from '../../services/base/BaseService';
 // import type { APIService } from '../../services/api/APIService';
@@ -134,7 +135,7 @@ import P2PKH from '../libs/P2PKH';
     }
     
     // 计算交易大小（字节）和手续费
-    const txSize = tx.toBinary().length;
+    const txSize = estimateSerializedTxSize(tx);
     let fee = Math.floor((txSize / 1000.0) * feeRate);
     if (fee === 0) {
       fee = 1; // 最低手续费为 1 satoshi

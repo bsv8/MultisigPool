@@ -33,3 +33,22 @@ func ClientBTripleFeePoolSpendTXUpdateSign(
 
 	return ClientBSignByte, nil
 }
+
+// ServerTripleFeePoolSpendTXUpdateSign 由 server（本场景就是 arbiter）对更新交易签名。
+func ServerTripleFeePoolSpendTXUpdateSign(
+	tx *tx.Transaction,
+	serverPrivateKey *ec.PrivateKey,
+	aPublicKey *ec.PublicKey,
+	bPublicKey *ec.PublicKey,
+) (*[]byte, error) {
+	sigHash := sighash.Flag(sighash.ForkID | sighash.All)
+	unlockTemplate, err := multisig.Unlock([]*ec.PrivateKey{serverPrivateKey}, []*ec.PublicKey{serverPrivateKey.PubKey(), aPublicKey, bPublicKey}, 2, &sigHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server unlocking script template: %w", err)
+	}
+	signBytes, err := unlockTemplate.SignOne(tx, 0, serverPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("server re-sign input failed: %v", err)
+	}
+	return signBytes, nil
+}

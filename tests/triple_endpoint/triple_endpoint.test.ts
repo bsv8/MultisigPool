@@ -6,9 +6,14 @@ import {
   tripleBuildFeePoolBaseTx,
   tripleBuildFeePoolSpendTX,
   tripleBuildFeePoolSpendTXWithProof,
+  tripleClientBFeePoolSpendTXUpdateSign,
+  tripleFeePoolLoadArbitrationTx,
+  tripleMergeFeePoolSigForSpendTx,
+  tripleServerFeePoolSpendTXUpdateSign,
   tripleSpendTXFeePoolBSign,
 } from '../../src/triple_endpoint';
 import { buildOptionalOpReturnScript } from '../../src/libs/OP_RETURN';
+import { clientVerifyServerSig, serverVerifyClientBSig } from '../../src/triple_endpoint/6verify';
 
 interface TestUTXO {
   txid: string;
@@ -200,5 +205,123 @@ describe('Triple Endpoint Tests', () => {
     expect(spendResp.tx.outputs[1].satoshis).toBe(spendResp.amount);
     expect(spendResp.tx.outputs[2].satoshis).toBe(0);
     expect(spendResp.tx.outputs[2].lockingScript.toHex()).toBe(buildOptionalOpReturnScript(proof)!.toHex());
+  });
+
+  test('should keep arbitration output order as B,A,arbiter_fee,OP_RETURN', async () => {
+    const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
+    const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
+    const escrowPriv = PrivateKey.fromHex(testData.escrowPrivHex);
+    const proof = Uint8Array.from([0xaa, 0xbb, 0xcc]);
+
+    const { tx: baseTx } = await tripleBuildFeePoolBaseTx(
+      testData.clientUtxos,
+      serverPriv.toPublicKey(),
+      clientPriv,
+      escrowPriv.toPublicKey(),
+      testData.feePerByte,
+    );
+    const poolValue = baseTx.outputs[0].satoshis as number;
+    const spendResp = await tripleBuildFeePoolSpendTX(
+      baseTx.id('hex'),
+      poolValue,
+      0,
+      serverPriv.toPublicKey(),
+      clientPriv,
+      escrowPriv.toPublicKey(),
+      testData.feePerByte,
+    );
+    const arbiterFee = 333;
+    const sellerAmount = 1111;
+    const arbitrationTx = await tripleFeePoolLoadArbitrationTx(
+      spendResp.tx,
+      serverPriv.toPublicKey(),
+      clientPriv.toPublicKey(),
+      escrowPriv.toPublicKey(),
+      poolValue,
+      arbiterFee,
+      undefined,
+      9,
+      sellerAmount,
+      proof,
+    );
+
+    expect(arbitrationTx.outputs.length).toBe(4);
+    expect(arbitrationTx.outputs[0].satoshis).toBe(sellerAmount);
+    expect(arbitrationTx.outputs[2].satoshis).toBe(arbiterFee);
+    expect(arbitrationTx.outputs[3].satoshis).toBe(0);
+    expect(arbitrationTx.outputs[3].lockingScript.toHex()).toBe(buildOptionalOpReturnScript(proof)!.toHex());
+  });
+
+  test('should sign arbitration tx by arbiter and seller then merge', async () => {
+    const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
+    const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
+    const escrowPriv = PrivateKey.fromHex(testData.escrowPrivHex);
+    const proof = Uint8Array.from(Buffer.from('arb-proof', 'utf8'));
+
+    const { tx: baseTx } = await tripleBuildFeePoolBaseTx(
+      testData.clientUtxos,
+      serverPriv.toPublicKey(),
+      clientPriv,
+      escrowPriv.toPublicKey(),
+      testData.feePerByte,
+    );
+    const poolValue = baseTx.outputs[0].satoshis as number;
+    const spendResp = await tripleBuildFeePoolSpendTX(
+      baseTx.id('hex'),
+      poolValue,
+      0,
+      serverPriv.toPublicKey(),
+      clientPriv,
+      escrowPriv.toPublicKey(),
+      testData.feePerByte,
+    );
+
+    const arbitrationTx = await tripleFeePoolLoadArbitrationTx(
+      spendResp.tx,
+      serverPriv.toPublicKey(),
+      clientPriv.toPublicKey(),
+      escrowPriv.toPublicKey(),
+      poolValue,
+      333,
+      undefined,
+      9,
+      1111,
+      proof,
+    );
+
+    const arbiterSig = await tripleServerFeePoolSpendTXUpdateSign(
+      arbitrationTx,
+      serverPriv,
+      clientPriv.toPublicKey(),
+      escrowPriv.toPublicKey(),
+    );
+    const sellerSig = await tripleClientBFeePoolSpendTXUpdateSign(
+      arbitrationTx,
+      serverPriv.toPublicKey(),
+      clientPriv.toPublicKey(),
+      escrowPriv,
+    );
+
+    expect(clientVerifyServerSig(
+      arbitrationTx,
+      poolValue,
+      serverPriv.toPublicKey(),
+      clientPriv.toPublicKey(),
+      escrowPriv.toPublicKey(),
+      Array.from(arbiterSig),
+    )).toBe(true);
+
+    expect(serverVerifyClientBSig(
+      arbitrationTx,
+      poolValue,
+      serverPriv.toPublicKey(),
+      clientPriv.toPublicKey(),
+      escrowPriv.toPublicKey(),
+      Array.from(sellerSig),
+    )).toBe(true);
+
+    const finalTx = tripleMergeFeePoolSigForSpendTx(arbitrationTx, arbiterSig, sellerSig);
+    expect(finalTx.inputs[0].unlockingScript).toBeDefined();
+    expect(finalTx.toHex().length).toBeGreaterThan(300);
   });
 });

@@ -3,10 +3,8 @@ import Transaction from '@bsv/sdk/transaction/Transaction';
 import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
 import Script from '@bsv/sdk/script/Script';
 import LockingScript from '@bsv/sdk/script/LockingScript';
-import { hash256 } from '@bsv/sdk/primitives/Hash';
-import * as ECDSA from '@bsv/sdk/primitives/ECDSA';
-import BigNumber from '@bsv/sdk/primitives/BigNumber';
 import { createDualMultisigScript } from './1base_tx';
+import MultiSig from '../libs/MULTISIG';
 
 /**
  * 服务器端为双端费用池花费交易回签
@@ -43,29 +41,12 @@ export function spendTXServerSign(
     lockingScript: priorityLocking,
   };
 
-  // 生成 sighash 数据
-  const sighashData = TransactionSignature.format({
-    sourceTXID: tx.inputs[0].sourceTXID || '',
-    sourceOutputIndex: tx.inputs[0].sourceOutputIndex,
-    sourceSatoshis: targetAmount,
-    transactionVersion: tx.version,
-    otherInputs: [],
-    outputs: tx.outputs,
-    inputIndex: 0,
-    subscript: priorityScript,
-    inputSequence: tx.inputs[0].sequence || 1,
-    lockTime: tx.lockTime,
-    scope: TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
-  });
-
-  // 服务器确定性签名（RFC6979）
-  const msgHash = hash256(sighashData);
-  const signature = ECDSA.sign(new BigNumber(msgHash, 16), serverPrivateKey, true);
-  const signatureDER = signature.toDER() as number[];
-  const serverSignBytes = [
-    ...signatureDER,
+  const serverSignBytes = new MultiSig().signOne(
+    tx,
+    0,
+    serverPrivateKey,
     TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID,
-  ];
+  );
 
-  return serverSignBytes;
+  return Array.from(serverSignBytes);
 }
