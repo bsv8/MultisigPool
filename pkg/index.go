@@ -42,6 +42,9 @@ var (
 	BuildTriplePoolState            = triple.BuildTriplePoolState
 	BuildTriplePoolInitialState     = triple.BuildTriplePoolInitialState
 	BuildTriplePoolFinalState       = triple.BuildTriplePoolFinalState
+	SignTriplePoolAsServer          = triple.SignTriplePoolAsServer
+	SignTriplePoolAsA               = triple.SignTriplePoolAsA
+	SignTriplePoolAsB               = triple.SignTriplePoolAsB
 	TriplePoolFeeSat                = triple.TriplePoolFeeSat
 	VerifySignature                 = triple.VerifySignature
 	// Triple endpoint verify helpers
