@@ -73,6 +73,9 @@ func VerifySignature(
 	publicKey *ec.PublicKey,
 	SignByte *[]byte,
 ) (bool, error) {
+	if tx == nil || publicKey == nil || SignByte == nil || len(*SignByte) < 2 {
+		return false, fmt.Errorf("transaction, public key and a DER signature are required")
+	}
 	// 获取签名哈希
 	sigHash := sighash.Flag(sighash.ForkID | sighash.All)
 

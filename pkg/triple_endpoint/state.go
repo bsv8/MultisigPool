@@ -7,12 +7,27 @@ package triple_endpoint
 import (
 	"fmt"
 
+	"github.com/bsv-blockchain/go-sdk/chainhash"
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
 	libs "github.com/bsv8/MultisigPool/pkg/libs"
 )
+
+// TriplePoolOpeningInput describes the one pool output that funds the first
+// state. It keeps funding-transaction parsing and the initial two-output
+// state template inside MultisigPool.
+type TriplePoolOpeningInput struct {
+	FundingTxID     []byte
+	PoolOutputIndex uint32
+	PoolAmount      uint64
+	LockTime        uint32
+	Server          *ec.PublicKey
+	A               *ec.PublicKey
+	B               *ec.PublicKey
+	FeeRate         FeeSatPerKB
+}
 
 type TriplePoolStateInput struct {
 	PreviousRawTx []byte
@@ -97,6 +112,69 @@ func BuildTriplePoolState(input TriplePoolStateInput) (*tx.Transaction, error) {
 	return state, nil
 }
 
+// BuildTriplePoolOpeningState constructs the initial, empty-unlocking state
+// directly from the funding outpoint. The returned transaction has exactly
+// two value outputs and no unlocking script.
+func BuildTriplePoolOpeningState(input TriplePoolOpeningInput) (*tx.Transaction, error) {
+	if len(input.FundingTxID) != 32 || input.Server == nil || input.A == nil || input.B == nil || input.PoolAmount == 0 {
+		return nil, fmt.Errorf("funding outpoint, pool amount and server/A/B keys are required")
+	}
+	lock, err := BuildTriplePoolLock(input.Server, input.A, input.B)
+	if err != nil {
+		return nil, err
+	}
+	serverAddress, err := libs.GetAddressFromPublicKey(input.Server, false)
+	if err != nil {
+		return nil, err
+	}
+	aAddress, err := libs.GetAddressFromPublicKey(input.A, false)
+	if err != nil {
+		return nil, err
+	}
+	serverScript, err := p2pkh.Lock(serverAddress)
+	if err != nil {
+		return nil, err
+	}
+	aScript, err := p2pkh.Lock(aAddress)
+	if err != nil {
+		return nil, err
+	}
+	state := tx.NewTransaction()
+	txid, err := chainhash.NewHash(input.FundingTxID)
+	if err != nil {
+		return nil, err
+	}
+	state.AddInputWithOutput(&tx.TransactionInput{
+		SourceTXID: txid, SourceTxOutIndex: input.PoolOutputIndex,
+		SequenceNumber: 1, UnlockingScript: script.NewFromBytes(nil),
+	}, &tx.TransactionOutput{Satoshis: input.PoolAmount, LockingScript: lock})
+	state.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: serverScript})
+	state.AddOutput(&tx.TransactionOutput{Satoshis: input.PoolAmount, LockingScript: aScript})
+	state.LockTime = input.LockTime
+	return applyTriplePoolFee(state, input.PoolAmount, input.FeeRate)
+}
+
+func applyTriplePoolFee(state *tx.Transaction, poolAmount uint64, rate FeeSatPerKB) (*tx.Transaction, error) {
+	if state == nil || len(state.Outputs) != 2 {
+		return nil, fmt.Errorf("triple pool state requires two outputs")
+	}
+	fake, err := libs.FakeSign(2)
+	if err != nil {
+		return nil, err
+	}
+	state.Inputs[0].UnlockingScript = fake
+	fee, err := TriplePoolFeeSat(state.Size(), rate)
+	state.Inputs[0].UnlockingScript = script.NewFromBytes(nil)
+	if err != nil {
+		return nil, err
+	}
+	if fee >= poolAmount {
+		return nil, fmt.Errorf("pool balance is insufficient for fee")
+	}
+	state.Outputs[1].Satoshis = poolAmount - fee
+	return state, nil
+}
+
 func SignTriplePoolAsServer(state *tx.Transaction, server *ec.PrivateKey, a, b *ec.PublicKey) (*[]byte, error) {
 	if server == nil || a == nil || b == nil || server.PubKey().IsEqual(a) || server.PubKey().IsEqual(b) {
 		return nil, fmt.Errorf("server key does not match the server slot")
@@ -120,6 +198,82 @@ func SignTriplePoolAsB(state *tx.Transaction, b *ec.PrivateKey, server, a *ec.Pu
 		return nil, fmt.Errorf("source pool output is required")
 	}
 	return SpendTXTripleFeePoolBSign(state, source.Satoshis, server, a, b)
+}
+
+// VerifyTriplePoolServerSignature verifies the server signature against the
+// same unsigned state and configured server slot.
+func VerifyTriplePoolServerSignature(state *tx.Transaction, server *ec.PublicKey, a, b *ec.PublicKey, signature *[]byte) (bool, error) {
+	if state == nil || server == nil || a == nil || b == nil {
+		return false, fmt.Errorf("state and server/A/B keys are required")
+	}
+	if server.IsEqual(a) || server.IsEqual(b) {
+		return false, fmt.Errorf("server key does not match the server slot")
+	}
+	return VerifySignature(state, 0, server, signature)
+}
+
+// VerifyTriplePoolASignature verifies an A/buyer signature.
+func VerifyTriplePoolASignature(state *tx.Transaction, a *ec.PublicKey, server, b *ec.PublicKey, signature *[]byte) (bool, error) {
+	if state == nil || a == nil || server == nil || b == nil {
+		return false, fmt.Errorf("state and server/A/B keys are required")
+	}
+	if a.IsEqual(server) || a.IsEqual(b) {
+		return false, fmt.Errorf("A key does not match the A slot")
+	}
+	return VerifySignature(state, 0, a, signature)
+}
+
+// VerifyTriplePoolBSignature verifies a B/arbiter signature.
+func VerifyTriplePoolBSignature(state *tx.Transaction, b *ec.PublicKey, server, a *ec.PublicKey, signature *[]byte) (bool, error) {
+	if state == nil || b == nil || server == nil || a == nil {
+		return false, fmt.Errorf("state and server/A/B keys are required")
+	}
+	if b.IsEqual(server) || b.IsEqual(a) {
+		return false, fmt.Errorf("B key does not match the B slot")
+	}
+	return VerifySignature(state, 0, b, signature)
+}
+
+// VerifyTriplePoolState checks the fixed role mapping, two-value-output
+// layout, empty unlocking script, and non-negative value conservation.
+func VerifyTriplePoolState(state *tx.Transaction, server, a, b *ec.PublicKey, poolAmount, sellerAmount uint64) error {
+	if state == nil || len(state.Inputs) != 1 || len(state.Outputs) != 2 || state.Inputs[0] == nil {
+		return fmt.Errorf("triple pool state must have one input and two outputs")
+	}
+	if state.Inputs[0].UnlockingScript != nil && len(state.Inputs[0].UnlockingScript.Bytes()) != 0 {
+		return fmt.Errorf("triple pool state must have an empty unlocking script")
+	}
+	lock, err := BuildTriplePoolLock(server, a, b)
+	if err != nil {
+		return err
+	}
+	source := state.Inputs[0].SourceTxOutput()
+	if source == nil || source.Satoshis != poolAmount || string(source.LockingScript.Bytes()) != string(lock.Bytes()) {
+		return fmt.Errorf("triple pool source output does not match the configured pool")
+	}
+	serverAddr, err := libs.GetAddressFromPublicKey(server, false)
+	if err != nil {
+		return err
+	}
+	aAddr, err := libs.GetAddressFromPublicKey(a, false)
+	if err != nil {
+		return err
+	}
+	serverScript, err := p2pkh.Lock(serverAddr)
+	if err != nil {
+		return err
+	}
+	aScript, err := p2pkh.Lock(aAddr)
+	if err != nil {
+		return err
+	}
+	if string(state.Outputs[0].LockingScript.Bytes()) != string(serverScript.Bytes()) || string(state.Outputs[1].LockingScript.Bytes()) != string(aScript.Bytes()) {
+		return fmt.Errorf("triple pool outputs do not match server and A roles")
+	}
+	if state.Outputs[0].Satoshis != sellerAmount || sellerAmount > poolAmount || state.Outputs[1].Satoshis > poolAmount-sellerAmount {
+		return fmt.Errorf("triple pool output amounts are invalid")
+	}
+	return nil
 }
 
 func BuildTriplePoolInitialState(input TriplePoolStateInput) (*tx.Transaction, error) {

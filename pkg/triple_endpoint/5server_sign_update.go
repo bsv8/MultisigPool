@@ -34,7 +34,7 @@ func ClientBTripleFeePoolSpendTXUpdateSign(
 	return ClientBSignByte, nil
 }
 
-// ServerTripleFeePoolSpendTXUpdateSign 由 server（本场景就是 arbiter）对更新交易签名。
+// ServerTripleFeePoolSpendTXUpdateSign signs an update as server (the seller).
 func ServerTripleFeePoolSpendTXUpdateSign(
 	tx *tx.Transaction,
 	serverPrivateKey *ec.PrivateKey,
