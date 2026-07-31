@@ -182,9 +182,9 @@ func main() {
 	displayTransaction("STEP 1 - BASE TRANSACTION", res1.Tx.String(),
 		fmt.Sprintf("Converts client1 UTXOs to 2-of-3 multisig output\nMultisig Amount: %d satoshis", res1.Amount))
 
-	// Step 2: 构建花费交易 (Client1 -> Client2, Server作为仲裁者)
+	// Step 2: 构建花费交易 (server=卖方, A=买方, B=仲裁者)
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("STEP 2: Build Spend Transaction (Client1 -> Client2, Server as Arbitrator)")
+	fmt.Println("STEP 2: Build Spend Transaction (server=seller, A=buyer, B=arbiter)")
 	fmt.Println(strings.Repeat("=", 60))
 
 	// 在三方费用池中，这里的参数实际上是总的输入金额
@@ -194,7 +194,7 @@ func main() {
 		log.Fatalf("Step 2 failed: %v", err)
 	}
 
-	// 在三方费用池中，Server不参与金额分配，只作为仲裁者
+	// 三方槽位固定为 server=卖方、A=买方、B=仲裁者；价值输出只属于 server 和 A。
 	// Client1 保留 client1Amount，剩余的给 Client2
 	client2Amount := res1.Amount - client1Amount
 	fmt.Printf("Client1 Amount (after fee): %d satoshis\n", client1Amount)
@@ -202,7 +202,7 @@ func main() {
 	fmt.Printf("Server Role: Arbitrator (no funds allocated)\n")
 
 	displayTransaction("STEP 2 - SPEND TRANSACTION (UNSIGNED)", bTx.String(),
-		fmt.Sprintf("Spends multisig: client1 (%d sats), client2 (%d sats)\nServer acts as arbitrator\nLocktime: %d",
+		fmt.Sprintf("Spends multisig: server/seller (%d sats), A/buyer (%d sats)\nB acts as arbiter\nLocktime: %d",
 			client1Amount, client2Amount, endHeight))
 
 	// Step 3: Client1 签名 (already done in BuildTripleFeePoolSpendTX)

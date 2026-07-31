@@ -145,7 +145,7 @@ func runTripleEndpointFixedUTXO() error {
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("STEP 2: Build Spend Transaction (Client1 -> Client2, Server as Arbitrator)")
+	fmt.Println("STEP 2: Build Spend Transaction (server=seller, A=buyer, B=arbiter)")
 	fmt.Println(strings.Repeat("=", 60))
 
 	bTx, client1SignBytes, client1Amount, err := te.BuildTripleFeePoolSpendTX(
@@ -161,7 +161,7 @@ func runTripleEndpointFixedUTXO() error {
 
 	spendTxUnsignedHex := bTx.String()
 	fmt.Printf("=== STEP 2 - SPEND TRANSACTION (UNSIGNED) ===\n")
-	fmt.Printf("Spends multisig: client1 (%d sats), client2 (%d sats)\nServer acts as arbitrator\nLocktime: %d\n",
+	fmt.Printf("Spends multisig: server/seller (%d sats), A/buyer (%d sats)\nB acts as arbiter\nLocktime: %d\n",
 		client1Amount, client2Amount, config.EndHeight)
 	fmt.Printf("TX Hex: %s\n", spendTxUnsignedHex)
 	fmt.Printf("Length: %d bytes\n", len(spendTxUnsignedHex)/2)

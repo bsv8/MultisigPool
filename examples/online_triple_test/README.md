@@ -30,8 +30,9 @@ go run examples/online_triple_test/main.go
 ## 参与方
 
 - **Client1**: 资金提供者（发起方），提供初始资金
-- **Client2**: 资金接收者，与 Client1 协商分配
-- **Server**: 仲裁者，不参与金额分配，只在争议时仲裁
+- **A / Client1**: 买方、资金出资方
+- **server**: 卖方，固定接收 output[0]
+- **B / Client2**: 仲裁者，不出现在价值输出中
 
 ## 注意
 
