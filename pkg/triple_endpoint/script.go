@@ -49,6 +49,23 @@ func MergeTripleFeePoolSigForSpendTx(
 	return bTx, nil
 }
 
+// MergeTriplePoolServerA fixes the CHECKMULTISIG order to server then A.
+func MergeTriplePoolServerA(txHex string, serverSig, aSig *[]byte) (*tx.Transaction, error) {
+	return mergeTripleRoleSigs(txHex, serverSig, aSig)
+}
+
+// MergeTriplePoolServerB fixes the CHECKMULTISIG order to server then B.
+func MergeTriplePoolServerB(txHex string, serverSig, bSig *[]byte) (*tx.Transaction, error) {
+	return mergeTripleRoleSigs(txHex, serverSig, bSig)
+}
+
+func mergeTripleRoleSigs(txHex string, first, second *[]byte) (*tx.Transaction, error) {
+	if first == nil || second == nil || len(*first) == 0 || len(*second) == 0 {
+		return nil, fmt.Errorf("two non-empty signatures are required")
+	}
+	return MergeTripleFeePoolSigForSpendTx(txHex, first, second)
+}
+
 // VerifySignature 验证ClientB的签名是否正确
 func VerifySignature(
 	tx *tx.Transaction,

@@ -61,12 +61,20 @@ func TripleFeePoolLoadTx(
 	// 更新输入
 	// bTx.Inputs[0].UnlockingScript = unScript
 	bTx.Inputs[0].SequenceNumber = sequenceNumber
+	bTx.Inputs[0].UnlockingScript = nil
 
 	// 更新输出金额
+	if len(bTx.Outputs) != 2 || bTx.Outputs[0] == nil || bTx.Outputs[1] == nil {
+		return nil, fmt.Errorf("triple pool state requires exactly two outputs")
+	}
 	allAmount := bTx.Outputs[0].Satoshis + bTx.Outputs[1].Satoshis
 	// fmt.Printf("++++++++++++++++++++++++++++++++++++++++++ allAmount: %d\n", allAmount)
 	bTx.Outputs[0].Satoshis = serverAmount
+	if serverAmount > allAmount {
+		return nil, fmt.Errorf("pool_insufficient")
+	}
 	bTx.Outputs[1].Satoshis = allAmount - serverAmount
+	bTx.Inputs[0].UnlockingScript = nil
 
 	// fmt.Printf("allamount: %d, ssatoshis 1: %d, satoshis 2: %d\n", allAmount, bTx.Outputs[0].Satoshis, bTx.Outputs[1].Satoshis)
 
