@@ -9,7 +9,7 @@ import (
 )
 
 // Version of the MultisigPool library
-const Version = "1.5.0"
+const Version = "2.0.0"
 
 // Re-export multisig types and functions
 type MultiSig = libs.MultiSig

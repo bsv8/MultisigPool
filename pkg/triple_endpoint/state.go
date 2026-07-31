@@ -1,8 +1,8 @@
 package triple_endpoint
 
-// This file is the role-explicit V1 boundary. The older endpoint names remain
-// available only for source compatibility; new integrations should use these
-// functions so slot order cannot be inferred from a runtime scenario.
+// This file is the role-explicit protocol-major-2 boundary. The older endpoint
+// names remain deprecated for source compatibility; new integrations must use
+// these functions so slot order cannot be inferred from a runtime scenario.
 
 import (
 	"bytes"
