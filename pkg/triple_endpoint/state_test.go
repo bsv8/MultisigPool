@@ -3,6 +3,7 @@ package triple_endpoint
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"testing"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
@@ -60,6 +61,25 @@ func TestBuildTriplePoolStateRejectsMalformedPreviousState(t *testing.T) {
 	if _, err := TriplePoolFeeSat(-1, 1); err == nil {
 		t.Fatal("negative transaction size was accepted")
 	}
+	feeCases := []struct {
+		size int
+		rate FeeSatPerKB
+		want uint64
+	}{
+		{size: 0, rate: 1, want: 0},
+		{size: 1, rate: 1, want: 1},
+		{size: 1000, rate: 1, want: 1},
+		{size: 1001, rate: 1, want: 2},
+	}
+	for _, tc := range feeCases {
+		got, err := TriplePoolFeeSat(tc.size, tc.rate)
+		if err != nil || got != tc.want {
+			t.Fatalf("fee(%d,%d) = %d, %v; want %d", tc.size, tc.rate, got, err, tc.want)
+		}
+	}
+	if _, err := TriplePoolFeeSat(math.MaxInt, 2); err == nil {
+		t.Fatal("fee overflow was accepted")
+	}
 	state, err := BuildTriplePoolOpeningState(TriplePoolOpeningInput{
 		FundingTxID: bytes.Repeat([]byte{8}, 32), PoolOutputIndex: 0, PoolAmount: 10000,
 		LockTime: 123, Server: serverKey.PubKey(), A: aKey.PubKey(), B: bKey.PubKey(), FeeRate: 1,
@@ -87,6 +107,21 @@ func TestBuildTriplePoolStateRejectsMalformedPreviousState(t *testing.T) {
 	}
 	if _, err := MergeTriplePoolServerA(state.Hex(), serverSig, serverSig); err == nil {
 		t.Fatal("duplicate signatures were accepted")
+	}
+	bSig, err := SignTriplePoolAsB(state, bKey, serverKey.PubKey(), aKey.PubKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	reversed, err := MergeTriplePoolServerB(state.Hex(), bSig, serverSig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reversed.Inputs[0].SetSourceTxOutput(state.Inputs[0].SourceTxOutput())
+	if ok, _ := VerifyTriplePoolServerSignature(reversed, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), bSig); ok {
+		t.Fatal("reversed server+B signature order passed server verification")
+	}
+	if _, err := MergeTriplePoolServerB(state.Hex(), serverSig, bSig); err != nil {
+		t.Fatalf("server+B merge failed: %v", err)
 	}
 	if _, err := MergeTriplePoolServerA(state.Hex(), serverSig, aSig); err != nil {
 		t.Fatalf("server+A merge failed: %v", err)
