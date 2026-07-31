@@ -197,6 +197,10 @@ func SignTriplePoolAsServer(state *tx.Transaction, server *ec.PrivateKey, a, b *
 	if server == nil || a == nil || b == nil || server.PubKey().IsEqual(a) || server.PubKey().IsEqual(b) {
 		return nil, fmt.Errorf("server key does not match the server slot")
 	}
+	lock, err := BuildTriplePoolLock(server.PubKey(), a, b)
+	if err != nil || !sourceMatchesPool(state, lock) {
+		return nil, fmt.Errorf("state source output does not match server/A/B roles")
+	}
 	return ServerTripleFeePoolSpendTXUpdateSign(state, server, a, b)
 }
 
@@ -206,6 +210,10 @@ func SignTriplePoolAsA(state *tx.Transaction, a *ec.PrivateKey, server, b *ec.Pu
 	}
 	if a == nil || server == nil || b == nil || a.PubKey().IsEqual(server) || a.PubKey().IsEqual(b) {
 		return nil, fmt.Errorf("A key does not match the A slot")
+	}
+	lock, err := BuildTriplePoolLock(server, a.PubKey(), b)
+	if err != nil || !sourceMatchesPool(state, lock) {
+		return nil, fmt.Errorf("state source output does not match server/A/B roles")
 	}
 	return ClientATripleFeePoolSpendTXUpdateSign(state, server, a, b)
 }
@@ -217,10 +225,11 @@ func SignTriplePoolAsB(state *tx.Transaction, b *ec.PrivateKey, server, a *ec.Pu
 	if b == nil || server == nil || a == nil || b.PubKey().IsEqual(server) || b.PubKey().IsEqual(a) {
 		return nil, fmt.Errorf("B key does not match the B slot")
 	}
-	source := state.Inputs[0].SourceTxOutput()
-	if source == nil {
-		return nil, fmt.Errorf("source pool output is required")
+	lock, err := BuildTriplePoolLock(server, a, b.PubKey())
+	if err != nil || !sourceMatchesPool(state, lock) {
+		return nil, fmt.Errorf("state source output does not match server/A/B roles")
 	}
+	source := state.Inputs[0].SourceTxOutput()
 	return SpendTXTripleFeePoolBSign(state, source.Satoshis, server, a, b)
 }
 
@@ -376,6 +385,14 @@ func validateTriplePoolSigningState(state *tx.Transaction, signer *ec.PrivateKey
 		return fmt.Errorf("state must have an empty unlocking script")
 	}
 	return nil
+}
+
+func sourceMatchesPool(state *tx.Transaction, lock *script.Script) bool {
+	if state == nil || lock == nil || len(state.Inputs) != 1 || state.Inputs[0] == nil {
+		return false
+	}
+	source := state.Inputs[0].SourceTxOutput()
+	return source != nil && bytes.Equal(source.LockingScript.Bytes(), lock.Bytes())
 }
 
 func BuildTriplePoolInitialState(input TriplePoolStateInput) (*tx.Transaction, error) {
