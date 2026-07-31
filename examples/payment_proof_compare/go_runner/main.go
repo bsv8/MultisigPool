@@ -31,7 +31,7 @@ type tripleFixture struct {
 	ServerPrivHex string      `json:"serverPrivHex"`
 	EscrowPrivHex string      `json:"escrowPrivHex"`
 	ClientUtxos   []libs.UTXO `json:"clientUtxos"`
-	FeeRate       float64     `json:"feeRate"`
+	FeeRate       uint64      `json:"feeRate"`
 	IsMain        bool        `json:"isMain"`
 }
 

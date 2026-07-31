@@ -17,7 +17,7 @@ import (
 
 const (
 	TESTNET_API_BASE = "https://api.whatsonchain.com/v1/bsv/test"
-	FEE_RATE         = 0.5
+	FEE_RATE         = 1
 	BLOCK_OFFSET     = 5
 )
 

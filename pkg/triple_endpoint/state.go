@@ -220,7 +220,9 @@ func attachTriplePoolSignature(state *tx.Transaction, signature []byte) (*tx.Tra
 		return nil, fmt.Errorf("state must have an empty unlocking script")
 	}
 	unlocking, err := libs.BuildSignScript(&[][]byte{signature})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	state.Inputs[0].UnlockingScript = unlocking
 	return state, nil
 }

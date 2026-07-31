@@ -17,7 +17,7 @@ import (
 
 // SubBuildTripleFeePoolSpendTX builds a two-output state transaction.
 // The fixed role order is server (seller), A (buyer), B (arbiter).
-func SubBuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
+func SubBuildTripleFeePoolSpendTX(
 	prevTxId string,
 	serverValue uint64, // server 提供金额
 	// cmdValue uint64, // cmd 提供金额
@@ -26,7 +26,7 @@ func SubBuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
 	aPrivateKey *ec.PrivateKey,
 	bPublicKey *ec.PublicKey,
 	isMain bool,
-	feeRate R,
+	feeRate uint64,
 ) (*tx.Transaction, uint64, error) {
 	return SubBuildTripleFeePoolSpendTXWithProof(
 		prevTxId,
@@ -43,7 +43,7 @@ func SubBuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
 
 // SubBuildTripleFeePoolSpendTXWithProof 构造三方费用池付款交易，并可追加付款证明 OP_RETURN。
 // 当前三方实现仍然是 2-of-3 资金池，proof 只影响输出集合，不改变门限语义。
-func SubBuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
+func SubBuildTripleFeePoolSpendTXWithProof(
 	prevTxId string,
 	serverValue uint64, // server 提供金额
 	endHeight uint32, // 区块高度
@@ -51,7 +51,7 @@ func SubBuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
 	aPrivateKey *ec.PrivateKey,
 	bPublicKey *ec.PublicKey,
 	isMain bool,
-	feeRate R,
+	feeRate uint64,
 	paymentProof []byte,
 ) (*tx.Transaction, uint64, error) {
 	aAddress, err := libs.GetAddressFromPublicKey(aPrivateKey.PubKey(), isMain)
@@ -144,16 +144,12 @@ func SubBuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
 
 	// 计算交易大小（字节）
 	// Integer satoshis per 1000 bytes, rounded up.
-	feeRateSatPerKB, err := integerFeeRate(feeRate)
+	fee, err := TriplePoolFeeSat(txSize, FeeSatPerKB(feeRate))
 	if err != nil {
 		return nil, 0, err
 	}
-	fee := (uint64(txSize)*feeRateSatPerKB + 999) / 1000
 	if serverValue < fee {
 		return nil, 0, fmt.Errorf("not enough balance, need %d, have %d", fee, serverValue)
-	}
-	if fee == 0 {
-		fee = 1
 	}
 
 	// 更新找零输出的金额
@@ -203,7 +199,7 @@ func SpendTXTripleFeePoolASign(
 // 构建双端费用池花费交易
 // 发起者 utxos, 服务器提供金额， 发起者私钥， 服务器地址
 // fee 是 server 提供，我只负责精确的金额
-func BuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
+func BuildTripleFeePoolSpendTX(
 	A_Tx *tx.Transaction,
 	serverValue uint64, // 服务器提供金额
 	endHeight uint32, // 区块高度
@@ -211,7 +207,7 @@ func BuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
 	aPrivateKey *ec.PrivateKey,
 	bPublicKey *ec.PublicKey,
 	isMain bool,
-	feeRate R,
+	feeRate uint64,
 ) (*tx.Transaction, *[]byte, uint64, error) {
 	return BuildTripleFeePoolSpendTXWithProof(
 		A_Tx,
@@ -227,7 +223,7 @@ func BuildTripleFeePoolSpendTX[R ~float64 | ~uint64](
 }
 
 // BuildTripleFeePoolSpendTXWithProof 构建三方费用池付款交易，并支持可选二进制付款证明。
-func BuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
+func BuildTripleFeePoolSpendTXWithProof(
 	A_Tx *tx.Transaction,
 	serverValue uint64, // 服务器提供金额
 	endHeight uint32, // 区块高度
@@ -235,7 +231,7 @@ func BuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
 	aPrivateKey *ec.PrivateKey,
 	bPublicKey *ec.PublicKey,
 	isMain bool,
-	feeRate R,
+	feeRate uint64,
 	paymentProof []byte,
 ) (*tx.Transaction, *[]byte, uint64, error) {
 

@@ -33,7 +33,7 @@ func BuildTripleFeePoolBaseTx(
 	aPrivateKey *ec.PrivateKey,
 	bPublicKey *ec.PublicKey,
 	isMain bool,
-	feeRate float64,
+	feeRate uint64,
 ) (*BuildStep1Response, error) {
 	clientAddress, err := libs.GetAddressFromPubKey(aPrivateKey.PubKey(), true)
 	if err != nil {
@@ -96,9 +96,12 @@ func BuildTripleFeePoolBaseTx(
 
 	// 计算交易大小（字节）
 	txSize := transactionData.Size()
-	fee := uint64(float64(txSize) / 1000.0 * float64(feeRate))
-	if fee == 0 {
-		fee = 1
+	fee, err := TriplePoolFeeSat(txSize, FeeSatPerKB(feeRate))
+	if err != nil {
+		return nil, err
+	}
+	if fee > totalValue {
+		return nil, fmt.Errorf("pool balance is insufficient for fee")
 	}
 	// fmt.Printf("fee: %d, txSize: %d, feeRate: %f\n", fee, txSize, c.feeRate)
 	// c.Logger.Debug("fee", zap.Int64("fee", int64(fee)), zap.Int64("txSize", int64(txSize)), zap.Float64("feeRate", c.feeRate))

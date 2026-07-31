@@ -17,15 +17,15 @@ import (
 
 // TestConfig holds all test parameters
 type TestConfig struct {
-	FeeRate          float64 `json:"fee_rate"`
-	EndHeight        uint32  `json:"end_height"`
-	Sequence2        uint32  `json:"sequence_2"`
-	NewClient1Amount uint64  `json:"new_client1_amount"`
-	FinalLocktime    uint32  `json:"final_locktime"`
-	FinalSequence    uint32  `json:"final_sequence"`
-	Client1PrivHex   string  `json:"client1_priv_hex"`
-	Client2PrivHex   string  `json:"client2_priv_hex"`
-	ServerPrivHex    string  `json:"server_priv_hex"`
+	FeeRate          uint64 `json:"fee_rate"`
+	EndHeight        uint32 `json:"end_height"`
+	Sequence2        uint32 `json:"sequence_2"`
+	NewClient1Amount uint64 `json:"new_client1_amount"`
+	FinalLocktime    uint32 `json:"final_locktime"`
+	FinalSequence    uint32 `json:"final_sequence"`
+	Client1PrivHex   string `json:"client1_priv_hex"`
+	Client2PrivHex   string `json:"client2_priv_hex"`
+	ServerPrivHex    string `json:"server_priv_hex"`
 	FixedUTXO        struct {
 		TxID  string `json:"txid"`
 		Vout  uint32 `json:"vout"`

@@ -1,17 +1,6 @@
 package triple_endpoint
 
-import (
-	"fmt"
-	"math"
-)
-
-func integerFeeRate[R ~float64 | ~uint64](rate R) (uint64, error) {
-	value := float64(rate)
-	if value < 0 || math.IsNaN(value) || math.IsInf(value, 0) || value > math.MaxUint64 {
-		return 0, fmt.Errorf("invalid integer fee rate")
-	}
-	return uint64(math.Ceil(value)), nil
-}
+import "fmt"
 
 // FeeSatPerKB is the integer fee unit used by every triple-pool state.
 type FeeSatPerKB uint64

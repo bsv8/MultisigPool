@@ -20,7 +20,7 @@ type Fixture struct {
 	EscrowPrivHex string      `json:"escrowPrivHex"`
 	ClientUtxos   []libs.UTXO `json:"clientUtxos"`
 	EndHeight     uint32      `json:"endHeight"`
-	FeeRate       float64     `json:"feePerByte"`
+	FeeRate       uint64      `json:"feePerKB"`
 	IsMain        bool        `json:"isMain"`
 	ChangeAddress string      `json:"changeAddress"` // not used currently
 	Arbitration   struct {
