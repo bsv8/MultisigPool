@@ -5,6 +5,7 @@ package triple_endpoint
 // functions so slot order cannot be inferred from a runtime scenario.
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/bsv-blockchain/go-sdk/chainhash"
@@ -63,13 +64,6 @@ func BuildTriplePoolState(input TriplePoolStateInput) (*tx.Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
-	total := state.Outputs[0].Satoshis + state.Outputs[1].Satoshis
-	if input.PoolAmount == 0 {
-		input.PoolAmount = total
-	}
-	if input.SellerAmount > total {
-		return nil, fmt.Errorf("seller amount exceeds state value")
-	}
 	serverAddr, err := libs.GetAddressFromPublicKey(input.Server, false)
 	if err != nil {
 		return nil, err
@@ -85,6 +79,27 @@ func BuildTriplePoolState(input TriplePoolStateInput) (*tx.Transaction, error) {
 	aScript, err := p2pkh.Lock(aAddr)
 	if err != nil {
 		return nil, err
+	}
+	if !bytes.Equal(state.Outputs[0].LockingScript.Bytes(), serverScript.Bytes()) || !bytes.Equal(state.Outputs[1].LockingScript.Bytes(), aScript.Bytes()) {
+		return nil, fmt.Errorf("previous state outputs do not match server and A roles")
+	}
+	if state.Outputs[0].Satoshis > ^uint64(0)-state.Outputs[1].Satoshis {
+		return nil, fmt.Errorf("previous state output amount overflows")
+	}
+	total := state.Outputs[0].Satoshis + state.Outputs[1].Satoshis
+	if input.PoolAmount == 0 {
+		input.PoolAmount = total
+	}
+	if total > input.PoolAmount {
+		return nil, fmt.Errorf("previous state value exceeds pool amount")
+	}
+	if source := state.Inputs[0].SourceTxOutput(); source != nil && (source.Satoshis != input.PoolAmount || !bytes.Equal(source.LockingScript.Bytes(), lock.Bytes())) {
+		return nil, fmt.Errorf("previous state source output does not match configured pool")
+	}
+	if input.SellerAmount > total {
+		if input.SellerAmount > input.PoolAmount {
+			return nil, fmt.Errorf("seller amount exceeds pool value")
+		}
 	}
 	state.Outputs[0].LockingScript = serverScript
 	state.Outputs[1].LockingScript = aScript
@@ -176,6 +191,9 @@ func applyTriplePoolFee(state *tx.Transaction, poolAmount uint64, rate FeeSatPer
 }
 
 func SignTriplePoolAsServer(state *tx.Transaction, server *ec.PrivateKey, a, b *ec.PublicKey) (*[]byte, error) {
+	if err := validateTriplePoolSigningState(state, server, a, b); err != nil {
+		return nil, err
+	}
 	if server == nil || a == nil || b == nil || server.PubKey().IsEqual(a) || server.PubKey().IsEqual(b) {
 		return nil, fmt.Errorf("server key does not match the server slot")
 	}
@@ -183,6 +201,9 @@ func SignTriplePoolAsServer(state *tx.Transaction, server *ec.PrivateKey, a, b *
 }
 
 func SignTriplePoolAsA(state *tx.Transaction, a *ec.PrivateKey, server, b *ec.PublicKey) (*[]byte, error) {
+	if err := validateTriplePoolSigningState(state, a, server, b); err != nil {
+		return nil, err
+	}
 	if a == nil || server == nil || b == nil || a.PubKey().IsEqual(server) || a.PubKey().IsEqual(b) {
 		return nil, fmt.Errorf("A key does not match the A slot")
 	}
@@ -190,6 +211,9 @@ func SignTriplePoolAsA(state *tx.Transaction, a *ec.PrivateKey, server, b *ec.Pu
 }
 
 func SignTriplePoolAsB(state *tx.Transaction, b *ec.PrivateKey, server, a *ec.PublicKey) (*[]byte, error) {
+	if err := validateTriplePoolSigningState(state, b, server, a); err != nil {
+		return nil, err
+	}
 	if b == nil || server == nil || a == nil || b.PubKey().IsEqual(server) || b.PubKey().IsEqual(a) {
 		return nil, fmt.Errorf("B key does not match the B slot")
 	}
@@ -332,8 +356,24 @@ func VerifyTriplePoolStateWithFee(state *tx.Transaction, server, a, b *ec.Public
 	if err != nil {
 		return err
 	}
-	if fee > poolAmount-sellerAmount || state.Outputs[1].Satoshis != poolAmount-sellerAmount-fee {
+	if sellerAmount > poolAmount || fee > poolAmount-sellerAmount || state.Outputs[1].Satoshis != poolAmount-sellerAmount-fee {
 		return fmt.Errorf("triple pool output amount does not match canonical fee")
+	}
+	return nil
+}
+
+func validateTriplePoolSigningState(state *tx.Transaction, signer *ec.PrivateKey, first, second *ec.PublicKey) error {
+	if signer == nil || first == nil || second == nil {
+		return fmt.Errorf("signer and pool public keys are required")
+	}
+	if signer.PubKey().IsEqual(first) || signer.PubKey().IsEqual(second) {
+		return fmt.Errorf("signer key does not match the requested role")
+	}
+	if state == nil || len(state.Inputs) != 1 || state.Inputs[0] == nil {
+		return fmt.Errorf("state must have exactly one input")
+	}
+	if state.Inputs[0].UnlockingScript != nil && len(state.Inputs[0].UnlockingScript.Bytes()) != 0 {
+		return fmt.Errorf("state must have an empty unlocking script")
 	}
 	return nil
 }
