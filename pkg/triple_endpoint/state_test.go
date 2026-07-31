@@ -67,6 +67,13 @@ func TestBuildTriplePoolStateRejectsMalformedPreviousState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := BuildTriplePoolState(TriplePoolStateInput{
+		PreviousRawTx: state.Bytes(), Sequence: state.Inputs[0].SequenceNumber,
+		SellerAmount: 1, PoolAmount: 10000, Server: serverKey.PubKey(),
+		A: aKey.PubKey(), B: bKey.PubKey(), FeeRate: 1,
+	}); err == nil {
+		t.Fatal("non-increasing payment sequence was accepted")
+	}
 	if _, err := SignTriplePoolAsServer(state, bKey, aKey.PubKey(), serverKey.PubKey()); err == nil {
 		t.Fatal("private key outside the server slot was accepted")
 	}
