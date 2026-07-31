@@ -127,17 +127,8 @@ func SubBuildTripleFeePoolSpendTXWithProof[R ~float64 | ~uint64](
 		LockingScript: clientChangeScript,
 	})
 
-	// Deprecated compatibility wrapper: canonical V1 callers use the no-proof
-	// builder. Keep the old argument accepted until the old examples are
-	// removed, but never include it in the canonical state path.
 	if len(paymentProof) != 0 {
-		opReturnScript, err := libs.BuildOptionalOpReturnScript(paymentProof)
-		if err != nil {
-			return nil, 0, fmt.Errorf("build legacy proof output: %w", err)
-		}
-		if opReturnScript != nil {
-			transactionTwo.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: opReturnScript})
-		}
+		return nil, 0, fmt.Errorf("payment proofs are not permitted in a V2 state transaction")
 	}
 
 	// 做一个假的签名script，方便计算 size

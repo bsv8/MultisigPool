@@ -11,8 +11,6 @@ import (
 
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
-	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
-	libs "github.com/bsv8/MultisigPool/pkg/libs"
 )
 
 // 最终 locaktime
@@ -80,84 +78,6 @@ func TripleFeePoolLoadTx(
 
 	// fmt.Printf("bTx 2: %s\n", bTx.Hex())
 
-	return bTx, nil
-}
-
-// TripleFeePoolLoadArbitrationTx 生成仲裁更新交易，输出顺序固定：
-// output[0]=B(收钱/供给方), output[1]=A(出钱/需求方), output[2]=arbiter_fee, output[3]=OP_RETURN(可选)。
-func TripleFeePoolLoadArbitrationTx(
-	txHex string,
-	locktime *uint32,
-	sequenceNumber uint32,
-	sellerAmount uint64,
-	arbiterFee uint64,
-	isMain bool,
-	serverPublicKey *ec.PublicKey,
-	aPublicKey *ec.PublicKey,
-	bPublicKey *ec.PublicKey,
-	targetAmount uint64,
-	opReturnPayload []byte,
-) (*transaction.Transaction, error) {
-	bTx, err := TripleFeePoolLoadTx(
-		txHex,
-		locktime,
-		sequenceNumber,
-		sellerAmount,
-		serverPublicKey,
-		aPublicKey,
-		bPublicKey,
-		targetAmount,
-	)
-	if err != nil {
-		return nil, err
-	}
-	allAmount := bTx.Outputs[0].Satoshis + bTx.Outputs[1].Satoshis
-	if sellerAmount+arbiterFee > allAmount {
-		return nil, fmt.Errorf("pool_insufficient")
-	}
-	buyerAmount := allAmount - sellerAmount - arbiterFee
-	bTx.Outputs[0].Satoshis = sellerAmount
-	bTx.Outputs[1].Satoshis = buyerAmount
-
-	// 固定第 3 个输出为 arbiter_fee（P2PKH 到仲裁者公钥）。
-	arbiterAddr, err := libs.GetAddressFromPublicKey(serverPublicKey, isMain)
-	if err != nil {
-		return nil, fmt.Errorf("derive arbiter address failed: %w", err)
-	}
-	arbiterLock, err := p2pkh.Lock(arbiterAddr)
-	if err != nil {
-		return nil, fmt.Errorf("build arbiter fee script failed: %w", err)
-	}
-	arbiterOutput := &tx.TransactionOutput{
-		Satoshis:      arbiterFee,
-		LockingScript: arbiterLock,
-	}
-	if len(bTx.Outputs) >= 3 {
-		bTx.Outputs[2] = arbiterOutput
-	} else {
-		bTx.AddOutput(arbiterOutput)
-	}
-
-	// 固定第 4 个输出为可选 OP_RETURN。
-	opReturnScript, err := libs.BuildOptionalOpReturnScript(opReturnPayload)
-	if err != nil {
-		return nil, fmt.Errorf("build op_return failed: %w", err)
-	}
-	if opReturnScript != nil {
-		opReturnOutput := &tx.TransactionOutput{
-			Satoshis:      0,
-			LockingScript: opReturnScript,
-		}
-		if len(bTx.Outputs) >= 4 {
-			bTx.Outputs[3] = opReturnOutput
-		} else {
-			bTx.AddOutput(opReturnOutput)
-		}
-	}
-	// 为了避免动态换序，最终只保留前四个输出位。
-	if len(bTx.Outputs) > 4 {
-		bTx.Outputs = bTx.Outputs[:4]
-	}
 	return bTx, nil
 }
 

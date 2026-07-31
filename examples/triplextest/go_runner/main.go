@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -104,49 +103,7 @@ func main() {
 	fmt.Printf("BuyerSig: %x\n", *clientSignBytes)
 	fmt.Printf("SellerSig: %x\n", *serverSignBytes)
 
-	// Step4: 进入仲裁更新交易（卖方金额 + 仲裁费 + 证据 OP_RETURN）
-	proofBytes, err := hex.DecodeString(f.Arbitration.ProofHex)
-	if err != nil {
-		log.Fatalf("decode proof hex: %v", err)
-	}
-	arbTx, err := te.TripleFeePoolLoadArbitrationTx(
-		tx2.String(),
-		nil,
-		f.Arbitration.SequenceNumber,
-		f.Arbitration.SellerAmount,
-		f.Arbitration.ArbiterFee,
-		f.IsMain,
-		serverPriv.PubKey(),
-		clientPriv.PubKey(),
-		escrowPriv.PubKey(),
-		step1.Amount,
-		proofBytes,
-	)
-	if err != nil {
-		log.Fatalf("step4 load arbitration tx: %v", err)
-	}
-	fmt.Printf("ArbitrationTxHex: %s\n", arbTx.String())
-
-	// Step5: 仲裁者签名（server）
-	arbiterSig, err := te.ServerTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv, clientPriv.PubKey(), escrowPriv.PubKey())
-	if err != nil {
-		log.Fatalf("step5 arbiter sign: %v", err)
-	}
-	fmt.Printf("ArbiterSig: %x\n", *arbiterSig)
-
-	// Step6: 卖方确认手续费后签名（不认可则业务层直接放弃，不广播）
-	sellerArbSig, err := te.ClientBTripleFeePoolSpendTXUpdateSign(arbTx, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
-	if err != nil {
-		log.Fatalf("step6 seller sign: %v", err)
-	}
-	fmt.Printf("SellerArbSig: %x\n", *sellerArbSig)
-
-	// Step7: 合成最终可广播交易（仲裁者签名 + 卖方签名）
-	finalTx, err := te.MergeTripleFeePoolSigForSpendTx(arbTx.String(), arbiterSig, sellerArbSig)
-	if err != nil {
-		log.Fatalf("step7 merge sign: %v", err)
-	}
-	fmt.Printf("FinalArbitrationHex: %s\n", finalTx.String())
-
+	// V2 arbitration is driven by the signed payment authorization and is
+	// intentionally not constructed by this low-level example.
 	_ = amount
 }
