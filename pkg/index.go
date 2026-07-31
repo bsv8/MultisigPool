@@ -54,6 +54,7 @@ var (
 	VerifyTriplePoolASignature      = triple.VerifyTriplePoolASignature
 	VerifyTriplePoolBSignature      = triple.VerifyTriplePoolBSignature
 	VerifyTriplePoolState           = triple.VerifyTriplePoolState
+	VerifyTriplePoolStateWithFee    = triple.VerifyTriplePoolStateWithFee
 	TriplePoolFeeSat                = triple.TriplePoolFeeSat
 	// Triple endpoint verify helpers
 	ServerVerifyClientASig               = triple.ServerVerifyClientASig

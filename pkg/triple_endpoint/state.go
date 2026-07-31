@@ -303,6 +303,41 @@ func VerifyTriplePoolState(state *tx.Transaction, server, a, b *ec.PublicKey, po
 	return nil
 }
 
+// VerifyTriplePoolStateWithFee additionally proves that the buyer output was
+// derived from the canonical integer fee policy for this exact state shape.
+// The fee probe uses the same deterministic fake unlocking script as the
+// builders, while the caller's transaction remains untouched.
+func VerifyTriplePoolStateWithFee(state *tx.Transaction, server, a, b *ec.PublicKey, poolAmount, sellerAmount uint64, rate FeeSatPerKB) error {
+	if err := VerifyTriplePoolState(state, server, a, b, poolAmount, sellerAmount); err != nil {
+		return err
+	}
+	if state == nil || len(state.Inputs) != 1 || state.Inputs[0] == nil || len(state.Outputs) != 2 {
+		return fmt.Errorf("triple pool state must have one input and two outputs")
+	}
+	probe, err := tx.NewTransactionFromBytes(state.Bytes())
+	if err != nil {
+		return fmt.Errorf("copy triple pool state for fee verification: %w", err)
+	}
+	source := state.Inputs[0].SourceTxOutput()
+	if source == nil {
+		return fmt.Errorf("triple pool source output is required")
+	}
+	probe.Inputs[0].SetSourceTxOutput(&tx.TransactionOutput{Satoshis: source.Satoshis, LockingScript: script.NewFromBytes(append([]byte(nil), source.LockingScript.Bytes()...))})
+	fake, err := libs.FakeSign(2)
+	if err != nil {
+		return err
+	}
+	probe.Inputs[0].UnlockingScript = fake
+	fee, err := TriplePoolFeeSat(probe.Size(), rate)
+	if err != nil {
+		return err
+	}
+	if fee > poolAmount-sellerAmount || state.Outputs[1].Satoshis != poolAmount-sellerAmount-fee {
+		return fmt.Errorf("triple pool output amount does not match canonical fee")
+	}
+	return nil
+}
+
 func BuildTriplePoolInitialState(input TriplePoolStateInput) (*tx.Transaction, error) {
 	input.SellerAmount = 0
 	return BuildTriplePoolState(input)

@@ -32,6 +32,13 @@ func TestBuildTriplePoolOpeningStateUsesServerAOutputs(t *testing.T) {
 	if err := VerifyTriplePoolState(state, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000, 0); err != nil {
 		t.Fatalf("canonical state verification failed: %v", err)
 	}
+	if err := VerifyTriplePoolStateWithFee(state, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000, 0, 1); err != nil {
+		t.Fatalf("canonical fee verification failed: %v", err)
+	}
+	state.Outputs[1].Satoshis--
+	if err := VerifyTriplePoolStateWithFee(state, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000, 0, 1); err == nil {
+		t.Fatal("fee-tampered state was accepted")
+	}
 	if _, err := SignTriplePoolAsServer(state, aKey, aKey.PubKey(), bKey.PubKey()); err == nil {
 		t.Fatal("wrong private key was accepted for server slot")
 	}
