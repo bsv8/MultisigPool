@@ -14,6 +14,9 @@ const Version = "1.5.0"
 // Re-export multisig types and functions
 type MultiSig = libs.MultiSig
 type UTXO = libs.UTXO
+type FeeSatPerKB = triple.FeeSatPerKB
+type TriplePoolStateInput = triple.TriplePoolStateInput
+type TriplePoolOpeningInput = triple.TriplePoolOpeningInput
 
 var (
 	// Multisig script creation
@@ -47,7 +50,7 @@ var (
 	SignTriplePoolAsA               = triple.SignTriplePoolAsA
 	SignTriplePoolAsB               = triple.SignTriplePoolAsB
 	AttachTriplePoolASignature      = triple.AttachTriplePoolASignature
-	AttachTriplePoolServerSignature  = triple.AttachTriplePoolServerSignature
+	AttachTriplePoolServerSignature = triple.AttachTriplePoolServerSignature
 	VerifyTriplePoolServerSignature = triple.VerifyTriplePoolServerSignature
 	VerifyTriplePoolASignature      = triple.VerifyTriplePoolASignature
 	VerifyTriplePoolBSignature      = triple.VerifyTriplePoolBSignature
