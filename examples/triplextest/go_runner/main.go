@@ -94,7 +94,7 @@ func main() {
 	}
 
 	// Step3: B(卖方)签名
-	serverSignBytes, err := te.SpendTXTripleFeePoolBSign(tx2, step1.Amount, serverPriv.PubKey(), clientPriv.PubKey(), escrowPriv)
+	serverSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(tx2, serverPriv, clientPriv.PubKey(), escrowPriv.PubKey())
 	if err != nil {
 		log.Fatalf("step3 server sign: %v", err)
 	}

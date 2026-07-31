@@ -217,7 +217,7 @@ func main() {
 	fmt.Println("STEP 4: Server Sign")
 	fmt.Println(strings.Repeat("=", 60))
 
-	serverSignBytes, err := te.SpendTXTripleFeePoolBSign(bTx, res1.Amount, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(bTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		log.Fatalf("Step 4 failed: %v", err)
 	}
@@ -225,7 +225,7 @@ func main() {
 	fmt.Printf("Server Signature: %x\n", *serverSignBytes)
 
 	// 组合签名创建完整交易 (2-of-3: client1 + server)
-	bTx, err = te.MergeTripleFeePoolSigForSpendTx(bTx.String(), client1SignBytes, serverSignBytes)
+	bTx, err = te.MergeTriplePoolServerA(bTx.String(), serverSignBytes, client1SignBytes)
 	if err != nil {
 		log.Fatalf("Failed to merge signatures: %v", err)
 	}
@@ -268,15 +268,15 @@ func main() {
 	fmt.Println("STEP 6: Client2 Agrees and Signs (Normal Negotiation)")
 	fmt.Println(strings.Repeat("=", 60))
 
-	client2UpdateSignBytes, err := te.ClientBTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverUpdateSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		log.Fatalf("Step 6 failed: %v", err)
 	}
 
-	fmt.Printf("Client2 Update Signature: %x\n", *client2UpdateSignBytes)
+	fmt.Printf("Server Update Signature: %x\n", *serverUpdateSignBytes)
 
 	// 组合更新后的签名 (2-of-3: client1 + client2 协商完成)
-	updatedTx, err = te.MergeTripleFeePoolSigForSpendTx(updatedTx.String(), client1UpdateSignBytes, client2UpdateSignBytes)
+	updatedTx, err = te.MergeTriplePoolServerA(updatedTx.String(), serverUpdateSignBytes, client1UpdateSignBytes)
 	if err != nil {
 		log.Fatalf("Failed to merge update signatures: %v", err)
 	}
@@ -305,13 +305,13 @@ func main() {
 	}
 
 	// 服务器最终签名
-	serverFinalSignBytes, err := te.SpendTXTripleFeePoolBSign(finalTx, res1.Amount, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverFinalSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(finalTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		log.Fatalf("Final server sign failed: %v", err)
 	}
 
 	// 组合最终签名 (2-of-3: client1 + server)
-	finalTx, err = te.MergeTripleFeePoolSigForSpendTx(finalTx.String(), client1FinalSignBytes, serverFinalSignBytes)
+	finalTx, err = te.MergeTriplePoolServerA(finalTx.String(), serverFinalSignBytes, client1FinalSignBytes)
 	if err != nil {
 		log.Fatalf("Failed to merge final signatures: %v", err)
 	}

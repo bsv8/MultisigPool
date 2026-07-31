@@ -182,7 +182,7 @@ func runTripleEndpointFixedUTXO() error {
 	fmt.Println("STEP 4: Server Sign")
 	fmt.Println(strings.Repeat("=", 60))
 
-	serverSignBytes, err := te.SpendTXTripleFeePoolBSign(bTx, res1.Amount, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(bTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		return fmt.Errorf("Step 4 failed: %w", err)
 	}
@@ -194,7 +194,7 @@ func runTripleEndpointFixedUTXO() error {
 		mismatches = append(mismatches, fmt.Sprintf("Server signature mismatch.\nExpected: %s\nGot:      %s", expected, serverSigHex))
 	}
 
-	bTx, err = te.MergeTripleFeePoolSigForSpendTx(bTx.String(), client1SignBytes, serverSignBytes)
+	bTx, err = te.MergeTriplePoolServerA(bTx.String(), serverSignBytes, client1SignBytes)
 	if err != nil {
 		return fmt.Errorf("Failed to merge signatures: %w", err)
 	}
@@ -249,19 +249,19 @@ func runTripleEndpointFixedUTXO() error {
 	fmt.Println("STEP 6: Client2 Agrees and Signs (Normal Negotiation)")
 	fmt.Println(strings.Repeat("=", 60))
 
-	client2UpdateSignBytes, err := te.ClientBTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverUpdateSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		return fmt.Errorf("Step 6 failed: %w", err)
 	}
 
-	client2UpdateSigHex := fmt.Sprintf("%x", *client2UpdateSignBytes)
-	fmt.Printf("Client2 Update Signature: %s\n", client2UpdateSigHex)
+	serverUpdateSigHex := fmt.Sprintf("%x", *serverUpdateSignBytes)
+	fmt.Printf("Server Update Signature: %s\n", serverUpdateSigHex)
 
-	if expected, exists := config.ExpectedOutputs["client2_update_signature"]; exists && client2UpdateSigHex != expected {
-		mismatches = append(mismatches, fmt.Sprintf("Client2 update signature mismatch.\nExpected: %s\nGot:      %s", expected, client2UpdateSigHex))
+	if expected, exists := config.ExpectedOutputs["server_update_signature"]; exists && serverUpdateSigHex != expected {
+		mismatches = append(mismatches, fmt.Sprintf("Server update signature mismatch.\nExpected: %s\nGot:      %s", expected, serverUpdateSigHex))
 	}
 
-	updatedTx, err = te.MergeTripleFeePoolSigForSpendTx(updatedTx.String(), client1UpdateSignBytes, client2UpdateSignBytes)
+	updatedTx, err = te.MergeTriplePoolServerA(updatedTx.String(), serverUpdateSignBytes, client1UpdateSignBytes)
 	if err != nil {
 		return fmt.Errorf("Failed to merge update signatures: %w", err)
 	}
@@ -292,12 +292,12 @@ func runTripleEndpointFixedUTXO() error {
 		return fmt.Errorf("Final client1 sign failed: %w", err)
 	}
 
-	serverFinalSignBytes, err := te.SpendTXTripleFeePoolBSign(finalTx, res1.Amount, serverPriv.PubKey(), client1Priv.PubKey(), client2Priv)
+	serverFinalSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(finalTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
 	if err != nil {
 		return fmt.Errorf("Final server sign failed: %w", err)
 	}
 
-	finalTx, err = te.MergeTripleFeePoolSigForSpendTx(finalTx.String(), client1FinalSignBytes, serverFinalSignBytes)
+	finalTx, err = te.MergeTriplePoolServerA(finalTx.String(), serverFinalSignBytes, client1FinalSignBytes)
 	if err != nil {
 		return fmt.Errorf("Failed to merge final signatures: %w", err)
 	}
