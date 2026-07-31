@@ -29,6 +29,30 @@ func TestBuildTriplePoolOpeningStateUsesServerAOutputs(t *testing.T) {
 	if state.LockTime != 123 || state.Inputs[0].SequenceNumber != 1 {
 		t.Fatal("opening state locktime/sequence changed")
 	}
+	if err := VerifyTriplePoolState(state, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000, 0); err != nil {
+		t.Fatalf("canonical state verification failed: %v", err)
+	}
+	if _, err := SignTriplePoolAsServer(state, aKey, aKey.PubKey(), bKey.PubKey()); err == nil {
+		t.Fatal("wrong private key was accepted for server slot")
+	}
+	if _, err := SignTriplePoolAsA(state, serverKey, serverKey.PubKey(), bKey.PubKey()); err == nil {
+		t.Fatal("wrong private key was accepted for A slot")
+	}
+	if _, err := SignTriplePoolAsB(state, serverKey, serverKey.PubKey(), aKey.PubKey()); err == nil {
+		t.Fatal("wrong private key was accepted for B slot")
+	}
+}
+
+func TestBuildTriplePoolStateRejectsMalformedPreviousState(t *testing.T) {
+	serverKey := mustTestPrivateKey(t, 1)
+	aKey := mustTestPrivateKey(t, 2)
+	bKey := mustTestPrivateKey(t, 3)
+	if _, err := BuildTriplePoolState(TriplePoolStateInput{PreviousRawTx: []byte{1, 2, 3}, PoolAmount: 100, Server: serverKey.PubKey(), A: aKey.PubKey(), B: bKey.PubKey(), FeeRate: 1}); err == nil {
+		t.Fatal("malformed previous state was accepted")
+	}
+	if _, err := TriplePoolFeeSat(-1, 1); err == nil {
+		t.Fatal("negative transaction size was accepted")
+	}
 }
 
 func mustTestPrivateKey(t *testing.T, value byte) *ec.PrivateKey {

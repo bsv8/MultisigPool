@@ -200,6 +200,31 @@ func SignTriplePoolAsB(state *tx.Transaction, b *ec.PrivateKey, server, a *ec.Pu
 	return SpendTXTripleFeePoolBSign(state, source.Satoshis, server, a, b)
 }
 
+// AttachTriplePoolASignature returns the candidate with only A's signature
+// attached. It is the 005 transport form and never claims to be final.
+func AttachTriplePoolASignature(state *tx.Transaction, signature []byte) (*tx.Transaction, error) {
+	return attachTriplePoolSignature(state, signature)
+}
+
+// AttachTriplePoolServerSignature returns the candidate with only server's
+// signature attached for the 007 transport form.
+func AttachTriplePoolServerSignature(state *tx.Transaction, signature []byte) (*tx.Transaction, error) {
+	return attachTriplePoolSignature(state, signature)
+}
+
+func attachTriplePoolSignature(state *tx.Transaction, signature []byte) (*tx.Transaction, error) {
+	if state == nil || len(state.Inputs) != 1 || state.Inputs[0] == nil || len(signature) == 0 {
+		return nil, fmt.Errorf("state and one non-empty signature are required")
+	}
+	if state.Inputs[0].UnlockingScript != nil && len(state.Inputs[0].UnlockingScript.Bytes()) != 0 {
+		return nil, fmt.Errorf("state must have an empty unlocking script")
+	}
+	unlocking, err := libs.BuildSignScript(&[][]byte{signature})
+	if err != nil { return nil, err }
+	state.Inputs[0].UnlockingScript = unlocking
+	return state, nil
+}
+
 // VerifyTriplePoolServerSignature verifies the server signature against the
 // same unsigned state and configured server slot.
 func VerifyTriplePoolServerSignature(state *tx.Transaction, server *ec.PublicKey, a, b *ec.PublicKey, signature *[]byte) (bool, error) {

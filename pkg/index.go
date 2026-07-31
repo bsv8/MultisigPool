@@ -46,6 +46,8 @@ var (
 	SignTriplePoolAsServer          = triple.SignTriplePoolAsServer
 	SignTriplePoolAsA               = triple.SignTriplePoolAsA
 	SignTriplePoolAsB               = triple.SignTriplePoolAsB
+	AttachTriplePoolASignature      = triple.AttachTriplePoolASignature
+	AttachTriplePoolServerSignature  = triple.AttachTriplePoolServerSignature
 	VerifyTriplePoolServerSignature = triple.VerifyTriplePoolServerSignature
 	VerifyTriplePoolASignature      = triple.VerifyTriplePoolASignature
 	VerifyTriplePoolBSignature      = triple.VerifyTriplePoolBSignature
