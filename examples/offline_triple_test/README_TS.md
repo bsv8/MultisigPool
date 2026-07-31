@@ -59,20 +59,19 @@ node dist/examples/offline_triple_test/main.js
 |---------|----------------|
 | `BuildTripleFeePoolBaseTx` | `tripleBuildFeePoolBaseTx` |
 | `BuildTripleFeePoolSpendTX` | `tripleBuildFeePoolSpendTX` |
-| `SpendTXTripleFeePoolBSign` | `tripleSpendTXFeePoolBSign` |
+| `ServerTripleFeePoolSpendTXUpdateSign` | `tripleServerFeePoolSpendTXUpdateSign` |
 | `TripleFeePoolLoadTx` | `tripleFeePoolLoadTx` |
 | `ClientATripleFeePoolSpendTXUpdateSign` | `tripleClientAFeePoolSpendTXUpdateSign` |
-| `ClientBTripleFeePoolSpendTXUpdateSign` | `tripleClientBFeePoolSpendTXUpdateSign` |
-| `MergeTripleFeePoolSigForSpendTx` | `tripleMergeFeePoolSigForSpendTx` |
+| `MergeTriplePoolServerA` | `tripleMergePoolServerA` |
 
 ## 交易流程
 
 1. **Step 1**: 创建基础交易 (Client1 UTXO → 2-of-3 多签)
-2. **Step 2**: 构建花费交易 (多签 → Client1 + Client2 输出)
+2. **Step 2**: 构建花费交易 (多签 → server + A 输出)
 3. **Step 3**: Client1 签名
 4. **Step 4**: Server 签名并合并
 5. **Step 5**: Client1 更新签名 (调整分配)
-6. **Step 6**: Client2 同意并签名
+6. **Step 6**: Server 与 A 协商签名
 7. **Final**: 关闭费用池 (设置最终 locktime 和 sequence)
 
 ## 广播顺序

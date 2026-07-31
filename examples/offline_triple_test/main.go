@@ -154,15 +154,16 @@ func runTripleEndpointFixedUTXO() error {
 		return fmt.Errorf("Step 2 failed: %w", err)
 	}
 
-	client2Amount := res1.Amount - client1Amount
-	fmt.Printf("Client1 Amount (after fee): %d satoshis\n", client1Amount)
-	fmt.Printf("Client2 Amount: %d satoshis\n", client2Amount)
-	fmt.Printf("Server Role: Arbitrator (no funds allocated)\n")
+	serverAmount := client1Amount
+	buyerAmount := res1.Amount - serverAmount
+	fmt.Printf("Server Amount (after fee): %d satoshis\n", serverAmount)
+	fmt.Printf("Buyer Amount: %d satoshis\n", buyerAmount)
+	fmt.Printf("B Role: Arbitrator (no funds allocated)\n")
 
 	spendTxUnsignedHex := bTx.String()
 	fmt.Printf("=== STEP 2 - SPEND TRANSACTION (UNSIGNED) ===\n")
 	fmt.Printf("Spends multisig: server/seller (%d sats), A/buyer (%d sats)\nB acts as arbiter\nLocktime: %d\n",
-		client1Amount, client2Amount, config.EndHeight)
+		serverAmount, buyerAmount, config.EndHeight)
 	fmt.Printf("TX Hex: %s\n", spendTxUnsignedHex)
 	fmt.Printf("Length: %d bytes\n", len(spendTxUnsignedHex)/2)
 	fmt.Println("---")
@@ -225,18 +226,18 @@ func runTripleEndpointFixedUTXO() error {
 		return fmt.Errorf("Step 5 client1 sign failed: %w", err)
 	}
 
-	newClient2Amount := res1.Amount - config.NewClient1Amount
+	newBuyerAmount := res1.Amount - config.NewClient1Amount
 	client1UpdateSigHex := fmt.Sprintf("%x", *client1UpdateSignBytes)
 	fmt.Printf("Client1 Update Signature: %s\n", client1UpdateSigHex)
 	fmt.Printf("New Client1 Amount: %d satoshis\n", config.NewClient1Amount)
-	fmt.Printf("New Client2 Amount: %d satoshis\n", newClient2Amount)
-	fmt.Printf("Server Role: Arbitrator (unchanged)\n")
+	fmt.Printf("New Buyer Amount: %d satoshis\n", newBuyerAmount)
+	fmt.Printf("B Role: Arbitrator (unchanged)\n")
 	fmt.Printf("New Sequence Number: %d\n", config.Sequence2)
 
 	updatedTxUnsignedHex := updatedTx.String()
 	fmt.Printf("=== STEP 5 - UPDATED TRANSACTION (UNSIGNED) ===\n")
 	fmt.Printf("Updated distribution - Client1: %d sats, Client2: %d sats, Sequence: %d\n",
-		config.NewClient1Amount, newClient2Amount, config.Sequence2)
+		config.NewClient1Amount, newBuyerAmount, config.Sequence2)
 	fmt.Printf("TX Hex: %s\n", updatedTxUnsignedHex)
 	fmt.Printf("Length: %d bytes\n", len(updatedTxUnsignedHex)/2)
 	fmt.Println("---")
@@ -246,7 +247,7 @@ func runTripleEndpointFixedUTXO() error {
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("STEP 6: Client2 Agrees and Signs (Normal Negotiation)")
+	fmt.Println("STEP 6: Server Signs (Normal Negotiation)")
 	fmt.Println(strings.Repeat("=", 60))
 
 	serverUpdateSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
@@ -268,7 +269,7 @@ func runTripleEndpointFixedUTXO() error {
 
 	completeUpdatedTxHex := updatedTx.String()
 	fmt.Printf("=== STEP 6 - COMPLETE UPDATED TRANSACTION ===\n")
-	fmt.Printf("Client1 + Client2 协商完成的交易，可以广播\n")
+	fmt.Printf("Server + A 协商完成的交易，可以广播\n")
 	fmt.Printf("TX Hex: %s\n", completeUpdatedTxHex)
 	fmt.Printf("Length: %d bytes\n", len(completeUpdatedTxHex)/2)
 	fmt.Println("---")
@@ -337,8 +338,8 @@ func runTripleEndpointFixedUTXO() error {
 	fmt.Printf("4. Final TX (Closed):    %s\n", finalTx.TxID())
 	fmt.Println()
 	fmt.Printf("Client1 Final Amount: %d satoshis\n", config.NewClient1Amount)
-	fmt.Printf("Client2 Final Amount: %d satoshis\n", newClient2Amount)
-	fmt.Printf("Server Role: Arbitrator (no funds)\n")
+	fmt.Printf("Buyer Final Amount: %d satoshis\n", newBuyerAmount)
+	fmt.Printf("B Role: Arbitrator (no funds)\n")
 	fmt.Println()
 	fmt.Println("BROADCAST ORDER:")
 	fmt.Println("1. First broadcast the Base Transaction (Step 1)")

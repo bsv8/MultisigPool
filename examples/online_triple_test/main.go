@@ -195,15 +195,16 @@ func main() {
 	}
 
 	// 三方槽位固定为 server=卖方、A=买方、B=仲裁者；价值输出只属于 server 和 A。
-	// Client1 保留 client1Amount，剩余的给 Client2
-	client2Amount := res1.Amount - client1Amount
-	fmt.Printf("Client1 Amount (after fee): %d satoshis\n", client1Amount)
-	fmt.Printf("Client2 Amount: %d satoshis\n", client2Amount)
-	fmt.Printf("Server Role: Arbitrator (no funds allocated)\n")
+	// output[0] belongs to server/seller; output[1] belongs to A/buyer.
+	serverAmount := client1Amount
+	buyerAmount := res1.Amount - serverAmount
+	fmt.Printf("Server Amount (after fee): %d satoshis\n", serverAmount)
+	fmt.Printf("Buyer Amount: %d satoshis\n", buyerAmount)
+	fmt.Printf("B Role: Arbitrator (no funds allocated)\n")
 
 	displayTransaction("STEP 2 - SPEND TRANSACTION (UNSIGNED)", bTx.String(),
 		fmt.Sprintf("Spends multisig: server/seller (%d sats), A/buyer (%d sats)\nB acts as arbiter\nLocktime: %d",
-			client1Amount, client2Amount, endHeight))
+			serverAmount, buyerAmount, endHeight))
 
 	// Step 3: Client1 签名 (already done in BuildTripleFeePoolSpendTX)
 	fmt.Println("\n" + strings.Repeat("=", 60))
@@ -252,20 +253,20 @@ func main() {
 		log.Fatalf("Step 5 client1 sign failed: %v", err)
 	}
 
-	newClient2Amount := res1.Amount - newClient1Amount
+	newBuyerAmount := res1.Amount - newClient1Amount
 	fmt.Printf("Client1 Update Signature: %x\n", *client1UpdateSignBytes)
 	fmt.Printf("New Client1 Amount: %d satoshis\n", newClient1Amount)
-	fmt.Printf("New Client2 Amount: %d satoshis\n", newClient2Amount)
-	fmt.Printf("Server Role: Arbitrator (unchanged)\n")
+	fmt.Printf("New Buyer Amount: %d satoshis\n", newBuyerAmount)
+	fmt.Printf("B Role: Arbitrator (unchanged)\n")
 	fmt.Printf("New Sequence Number: %d\n", newSequenceNumber)
 
 	displayTransaction("STEP 5 - UPDATED TRANSACTION (UNSIGNED)", updatedTx.String(),
-		fmt.Sprintf("Updated distribution - Client1: %d sats, Client2: %d sats, Sequence: %d",
-			newClient1Amount, newClient2Amount, newSequenceNumber))
+		fmt.Sprintf("Updated distribution - server: %d sats, A: %d sats, Sequence: %d",
+			newClient1Amount, newBuyerAmount, newSequenceNumber))
 
-	// Step 6: Client2 同意更新签名（正常协商流程）
+	// Step 6: Server signs together with A (normal negotiation)
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("STEP 6: Client2 Agrees and Signs (Normal Negotiation)")
+	fmt.Println("STEP 6: Server Signs (Normal Negotiation)")
 	fmt.Println(strings.Repeat("=", 60))
 
 	serverUpdateSignBytes, err := te.ServerTripleFeePoolSpendTXUpdateSign(updatedTx, serverPriv, client1Priv.PubKey(), client2Priv.PubKey())
@@ -275,14 +276,14 @@ func main() {
 
 	fmt.Printf("Server Update Signature: %x\n", *serverUpdateSignBytes)
 
-	// 组合更新后的签名 (2-of-3: client1 + client2 协商完成)
+	// 组合更新后的签名 (2-of-3: server + A)
 	updatedTx, err = te.MergeTriplePoolServerA(updatedTx.String(), serverUpdateSignBytes, client1UpdateSignBytes)
 	if err != nil {
 		log.Fatalf("Failed to merge update signatures: %v", err)
 	}
 
 	displayTransaction("STEP 6 - COMPLETE UPDATED TRANSACTION", updatedTx.String(),
-		"Client1 + Client2 协商完成的交易，可以广播")
+		"Server + A 协商完成的交易，可以广播")
 
 	// 最终步骤：关闭费用池（设置 locktime 和 sequence 为 0xffffffff）
 	fmt.Println("\n" + strings.Repeat("=", 60))
@@ -334,8 +335,8 @@ func main() {
 	fmt.Printf("4. Final TX (Closed):    %s\n", finalTx.TxID())
 	fmt.Println()
 	fmt.Printf("Client1 Final Amount: %d satoshis\n", newClient1Amount)
-	fmt.Printf("Client2 Final Amount: %d satoshis\n", newClient2Amount)
-	fmt.Printf("Server Role: Arbitrator (no funds)\n")
+	fmt.Printf("Buyer Final Amount: %d satoshis\n", newBuyerAmount)
+	fmt.Printf("B Role: Arbitrator (no funds)\n")
 	fmt.Println()
 	fmt.Println("BROADCAST ORDER:")
 	fmt.Println("1. First broadcast the Base Transaction (Step 1)")
