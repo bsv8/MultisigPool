@@ -22,8 +22,8 @@ import {
 
 const validManifest = Object.freeze({
   schemaVersion: 1,
-  protocol: Object.freeze({ id: 'bitfs.pool.v3', version: 3, goModuleMajor: 3 }),
-  packages: Object.freeze({ npm: '3.0.0', go: '3.0.0', rust: '3.0.0' }),
+  protocol: Object.freeze({ id: 'bitfs.pool.v4', version: 4, goModuleMajor: 4 }),
+  packages: Object.freeze({ npm: '4.0.0', go: '4.0.0', rust: '4.0.0' }),
 });
 
 const fixtureFiles = Object.freeze([
@@ -84,17 +84,17 @@ test('缺失字段和未知字段都会失败', () => {
   assert.throws(() => parseVersionsManifest(JSON.stringify(missing)), /goModuleMajor is missing/);
 
   const unknown = structuredClone(validManifest);
-  unknown.packages.extra = '3.0.0';
+  unknown.packages.extra = '4.0.0';
   assert.throws(() => parseVersionsManifest(JSON.stringify(unknown)), /packages\.extra is unknown/);
 });
 
 test('协议字段和包版本必须使用施工单规定的类型与格式', () => {
   const invalidProtocol = structuredClone(validManifest);
   invalidProtocol.protocol.version = '3';
-  assert.throws(() => parseVersionsManifest(JSON.stringify(invalidProtocol)), /expected integer 3/);
+  assert.throws(() => parseVersionsManifest(JSON.stringify(invalidProtocol)), /expected integer 4/);
 
   const invalidPackage = structuredClone(validManifest);
-  invalidPackage.packages.npm = 'v3.0.0';
+  invalidPackage.packages.npm = 'v4.0.0';
   assert.throws(() => parseVersionsManifest(JSON.stringify(invalidPackage)), /complete SemVer/);
 
   const splitVersionLine = structuredClone(validManifest);
@@ -123,44 +123,44 @@ test('check 能发现所有版本镜像文件被篡改', () => {
     {
       name: 'package.json',
       relativePath: 'package.json',
-      mutate: (text) => text.replace('  "version": "3.0.0",', '  "version": "9.9.9",'),
-      expected: /package\.json: version expected "3\.0\.0", actual "9\.9\.9"/,
+      mutate: (text) => text.replace('  "version": "4.0.0",', '  "version": "9.9.9",'),
+      expected: /package\.json: version expected "4\.0\.0", actual "9\.9\.9"/,
     },
     {
       name: 'package-lock.json',
       relativePath: 'package-lock.json',
-      mutate: (text) => text.replace('  "version": "3.0.0",', '  "version": "9.9.9",'),
-      expected: /package-lock\.json: version expected "3\.0\.0", actual "9\.9\.9"/,
+      mutate: (text) => text.replace('  "version": "4.0.0",', '  "version": "9.9.9",'),
+      expected: /package-lock\.json: version expected "4\.0\.0", actual "9\.9\.9"/,
     },
     {
       name: 'rust/Cargo.toml',
       relativePath: 'rust/Cargo.toml',
-      mutate: (text) => text.replace('version = "3.0.0"', 'version = "3.0.1"'),
-      expected: /rust\/Cargo\.toml: package\.version expected "3\.0\.0", actual "3\.0\.1"/,
+      mutate: (text) => text.replace('version = "4.0.0"', 'version = "3.0.1"'),
+      expected: /rust\/Cargo\.toml: package\.version expected "4\.0\.0", actual "3\.0\.1"/,
     },
     {
       name: 'rust/Cargo.lock',
       relativePath: 'rust/Cargo.lock',
-      mutate: (text) => text.replace('name = "keymaster-multisig-rust"\nversion = "3.0.0"', 'name = "keymaster-multisig-rust"\nversion = "3.0.1"'),
-      expected: /rust\/Cargo\.lock: keymaster-multisig-rust version expected "3\.0\.0", actual "3\.0\.1"/,
+      mutate: (text) => text.replace('name = "keymaster-multisig-rust"\nversion = "4.0.0"', 'name = "keymaster-multisig-rust"\nversion = "3.0.1"'),
+      expected: /rust\/Cargo\.lock: keymaster-multisig-rust version expected "4\.0\.0", actual "3\.0\.1"/,
     },
     {
       name: 'internal/versioninfo/version.go',
       relativePath: 'internal/versioninfo/version.go',
-      mutate: (text) => text.replace('const GoReleaseVersion = "3.0.0"', 'const GoReleaseVersion = "9.9.9"'),
-      expected: /internal\/versioninfo\/version\.go: GoReleaseVersion expected "3\.0\.0", actual "9\.9\.9"/,
+      mutate: (text) => text.replace('const GoReleaseVersion = "4.0.0"', 'const GoReleaseVersion = "9.9.9"'),
+      expected: /internal\/versioninfo\/version\.go: GoReleaseVersion expected "4\.0\.0", actual "9\.9\.9"/,
     },
     {
       name: 'src/version.ts',
       relativePath: 'src/version.ts',
-      mutate: (text) => text.replace("export const ReleaseVersion = '3.0.0'", "export const ReleaseVersion = '9.9.9'"),
-      expected: /src\/version\.ts: ReleaseVersion expected "3\.0\.0", actual "9\.9\.9"/,
+      mutate: (text) => text.replace("export const ReleaseVersion = '4.0.0'", "export const ReleaseVersion = '9.9.9'"),
+      expected: /src\/version\.ts: ReleaseVersion expected "4\.0\.0", actual "9\.9\.9"/,
     },
     {
       name: 'rust/src/version.rs',
       relativePath: 'rust/src/version.rs',
-      mutate: (text) => text.replace('pub const RELEASE_VERSION: &str = "3.0.0"', 'pub const RELEASE_VERSION: &str = "3.0.1"'),
-      expected: /rust\/src\/version\.rs: RELEASE_VERSION expected "3\.0\.0", actual "3\.0\.1"/,
+      mutate: (text) => text.replace('pub const RELEASE_VERSION: &str = "4.0.0"', 'pub const RELEASE_VERSION: &str = "3.0.1"'),
+      expected: /rust\/src\/version\.rs: RELEASE_VERSION expected "4\.0\.0", actual "3\.0\.1"/,
     },
   ];
 
@@ -206,31 +206,31 @@ test('sync 连续执行两次结果完全幂等', () => {
 test('版本目标字段为零次或多次时都会失败', () => {
   const packageText = fs.readFileSync(path.join(ROOT_DIRECTORY, 'package.json'), 'utf8');
   assert.throws(
-    () => renderPackageJson(packageText.replace('  "version": "3.0.0",\n', ''), '3.0.1'),
+    () => renderPackageJson(packageText.replace('  "version": "4.0.0",\n', ''), '3.0.1'),
     /expected exactly one (?:root|top-level) version field, found 0/,
   );
   assert.throws(
-    () => renderPackageJson(packageText.replace('  "version": "3.0.0",\n', '  "version": "3.0.0",\n  "version": "3.0.0",\n'), '3.0.1'),
+    () => renderPackageJson(packageText.replace('  "version": "4.0.0",\n', '  "version": "4.0.0",\n  "version": "4.0.0",\n'), '3.0.1'),
     /expected exactly one top-level version field, found 2/,
   );
 
   const cargoText = fs.readFileSync(path.join(ROOT_DIRECTORY, 'rust/Cargo.toml'), 'utf8');
   assert.throws(
-    () => renderCargoManifest(cargoText.replace('version = "3.0.0"\n', ''), '3.0.1'),
+    () => renderCargoManifest(cargoText.replace('version = "4.0.0"\n', ''), '3.0.1'),
     /expected exactly one package version field, found 0/,
   );
   assert.throws(
-    () => renderCargoManifest(cargoText.replace('version = "3.0.0"\n', 'version = "3.0.0"\nversion = "3.0.0"\n'), '3.0.1'),
+    () => renderCargoManifest(cargoText.replace('version = "4.0.0"\n', 'version = "4.0.0"\nversion = "4.0.0"\n'), '3.0.1'),
     /expected exactly one package version field, found 2/,
   );
 
   const lockText = fs.readFileSync(path.join(ROOT_DIRECTORY, 'rust/Cargo.lock'), 'utf8');
   assert.throws(
-    () => renderCargoLock(lockText.replace(/name = "keymaster-multisig-rust"\nversion = "3\.0\.0"\n/, ''), '3.0.1'),
+    () => renderCargoLock(lockText.replace(/name = "keymaster-multisig-rust"\nversion = "4\.0\.0"\n/, ''), '3.0.1'),
     /expected exactly one keymaster-multisig-rust package, found 0/,
   );
   assert.throws(
-    () => renderCargoLock(`${lockText}\n${lockText.match(/name = "keymaster-multisig-rust"\nversion = "3\.0\.0"\n/)[0]}`, '3.0.1'),
+    () => renderCargoLock(`${lockText}\n${lockText.match(/name = "keymaster-multisig-rust"\nversion = "4\.0\.0"\n/)[0]}`, '3.0.1'),
     /expected exactly one keymaster-multisig-rust package, found 2/,
   );
 });

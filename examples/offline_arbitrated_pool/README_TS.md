@@ -1,4 +1,4 @@
-# TypeScript v3 离线流程
+# TypeScript v4 离线流程
 
 ```bash
 npx tsx examples/arbitrated_pool_compare/main.ts

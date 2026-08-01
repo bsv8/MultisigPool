@@ -64,6 +64,7 @@ export interface ArbitratedPoolStateInput {
   readonly lockTime?: number;
   readonly buyerAmount?: number;
   readonly sellerAmount: number;
+  readonly arbiterAmount: number;
   readonly poolAmount: number;
   readonly roles: ArbitratedPoolRoles;
   readonly feeRate: number;

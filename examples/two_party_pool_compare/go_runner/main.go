@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv8/MultisigPool/v3/pkg/libs"
-	pool "github.com/bsv8/MultisigPool/v3/pkg/two_party_pool"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
+	pool "github.com/bsv8/MultisigPool/v4/pkg/two_party_pool"
 )
 
 func main() {

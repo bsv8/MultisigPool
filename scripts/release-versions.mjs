@@ -104,14 +104,14 @@ export function validateVersionsManifest(value) {
   const packageErrors = exactKeys(value.packages, ['npm', 'go', 'rust'], 'versions.json.packages');
   const protocolFieldErrors = isRecord(value.protocol)
     ? [
-        ...(value.protocol.id !== 'bitfs.pool.v3'
-          ? [`versions.json.protocol.id expected "bitfs.pool.v3", actual ${describe(value.protocol.id)}`]
+        ...(value.protocol.id !== 'bitfs.pool.v4'
+          ? [`versions.json.protocol.id expected "bitfs.pool.v4", actual ${describe(value.protocol.id)}`]
           : []),
         ...(Object.hasOwn(value.protocol, 'version')
-          ? requiredInteger(value.protocol.version, 'versions.json.protocol.version', 3)
+          ? requiredInteger(value.protocol.version, 'versions.json.protocol.version', 4)
           : []),
         ...(Object.hasOwn(value.protocol, 'goModuleMajor')
-          ? requiredInteger(value.protocol.goModuleMajor, 'versions.json.protocol.goModuleMajor', 3)
+          ? requiredInteger(value.protocol.goModuleMajor, 'versions.json.protocol.goModuleMajor', 4)
           : []),
       ]
     : [];
@@ -600,7 +600,7 @@ const syncStructureErrors = (rootDirectory) => {
   }
 
   return [...generatedErrors, ...jsonErrors, ...cargoErrors, ...checkGoModule(rootDirectory, {
-    protocol: { goModuleMajor: 3 },
+    protocol: { goModuleMajor: 4 },
   }), ...checkPublicVersionImports(rootDirectory)];
 };
 

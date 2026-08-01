@@ -1,30 +1,59 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PrivateKey } from '@bsv/sdk/primitives';
-import Transaction from '@bsv/sdk/transaction/Transaction';
-import { buildArbitratedPoolLock, mergeArbitratedPoolBuyerArbiterSignatures, mergeArbitratedPoolBuyerSellerSignatures, mergeArbitratedPoolSellerArbiterSignatures, signArbitratedPoolAsArbiter, signArbitratedPoolAsBuyer, signArbitratedPoolAsSeller } from '../../src/arbitrated_pool';
+import { buildArbitratedPoolFundingTx, buildArbitratedPoolLock, buildArbitratedPoolOpeningState, buildArbitratedPoolState, mergeArbitratedPoolBuyerArbiterSignatures, mergeArbitratedPoolBuyerSellerSignatures, mergeArbitratedPoolSellerArbiterSignatures, signArbitratedPoolAsArbiter, signArbitratedPoolAsBuyer, signArbitratedPoolAsSeller } from '../../src/arbitrated_pool';
+import { Protocol, Version } from '../../src/version';
 
-const fixture = JSON.parse(readFileSync(resolve('testdata/arbitrated_pool_v3_fixture.json'), 'utf8')) as { stateTxHex: string; poolAmount: number; sourceTxID: string };
-const buyer = PrivateKey.fromHex('a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c');
-const seller = PrivateKey.fromHex('903b1b2c396f17203fa83444d72bf5c666119d9d681eb715520f99ae6f92322c');
-const arbiter = PrivateKey.fromHex('a2d2ca4c19e3c560792ca751842c29b9da94be09f712a7f9ba7c66e64a354829');
+type Fixture = {
+  protocol: string;
+  version: number;
+  feeRate: number;
+  buyerPrivHex: string;
+  sellerPrivHex: string;
+  arbiterPrivHex: string;
+  buyerUtxos: { txid: string; vout: number; satoshis: number }[];
+  poolAmount: number;
+  lockTime: number;
+  negotiationSequence: number;
+  negotiationSellerAmount: number;
+  negotiationArbiterAmount: number;
+  paidArbiterSequence: number;
+  paidArbiterSellerAmount: number;
+  paidArbiterAmount: number;
+  proofSequence: number;
+  proofSellerAmount: number;
+  proofArbiterAmount: number;
+  paymentProofHex: string;
+};
+
+const fixture = JSON.parse(readFileSync(resolve(__dirname, '../../testdata/arbitrated_pool_v4_fixture.json'), 'utf8')) as Fixture;
+if (fixture.protocol !== Protocol || fixture.version !== Version) throw new Error('fixture protocol does not match v4');
+const buyer = PrivateKey.fromHex(fixture.buyerPrivHex);
+const seller = PrivateKey.fromHex(fixture.sellerPrivHex);
+const arbiter = PrivateKey.fromHex(fixture.arbiterPrivHex);
 const roles = { buyer: buyer.toPublicKey(), seller: seller.toPublicKey(), arbiter: arbiter.toPublicKey() };
-const state = Transaction.fromHex(fixture.stateTxHex);
-const source = new Transaction();
-source.outputs = [{ satoshis: fixture.poolAmount, lockingScript: buildArbitratedPoolLock(roles) }];
-state.inputs[0].sourceTransaction = source;
-const buyerSignature = signArbitratedPoolAsBuyer(state, fixture.poolAmount, roles, buyer);
-const sellerSignature = signArbitratedPoolAsSeller(state, fixture.poolAmount, roles, seller);
-const arbiterSignature = signArbitratedPoolAsArbiter(state, fixture.poolAmount, roles, arbiter);
-const finalBuyerSeller = mergeArbitratedPoolBuyerSellerSignatures(state, fixture.poolAmount, roles, buyerSignature, sellerSignature);
-const finalBuyerArbiter = mergeArbitratedPoolBuyerArbiterSignatures(state, fixture.poolAmount, roles, buyerSignature, arbiterSignature);
-const finalSellerArbiter = mergeArbitratedPoolSellerArbiterSignatures(state, fixture.poolAmount, roles, sellerSignature, arbiterSignature);
 
-console.log(`LockHex ${source.outputs[0].lockingScript.toHex()}`);
-console.log(`StateHex ${state.toHex()}`);
-console.log(`BuyerSignatureHex ${Buffer.from(buyerSignature).toString('hex')}`);
-console.log(`SellerSignatureHex ${Buffer.from(sellerSignature).toString('hex')}`);
-console.log(`ArbiterSignatureHex ${Buffer.from(arbiterSignature).toString('hex')}`);
-console.log(`FinalBuyerSellerHex ${finalBuyerSeller.toHex()}`);
-console.log(`FinalBuyerArbiterHex ${finalBuyerArbiter.toHex()}`);
-console.log(`FinalSellerArbiterHex ${finalSellerArbiter.toHex()}`);
+const main = async (): Promise<void> => {
+  const funding = await buildArbitratedPoolFundingTx(fixture.buyerUtxos, fixture.poolAmount, buyer, roles, fixture.feeRate);
+  const opening = await buildArbitratedPoolOpeningState(funding.tx, funding.poolAmount, roles, fixture.lockTime, fixture.feeRate);
+  const build = (previousState: typeof opening, sequence: number, sellerAmount: number, arbiterAmount: number, paymentProof?: number[]) => buildArbitratedPoolState({ protocol: fixture.protocol, version: fixture.version, previousState, sequence, sellerAmount, arbiterAmount, poolAmount: funding.poolAmount, roles, feeRate: fixture.feeRate, paymentProof });
+  const negotiation = await build(opening, fixture.negotiationSequence, fixture.negotiationSellerAmount, fixture.negotiationArbiterAmount);
+  const paidArbiter = await build(negotiation, fixture.paidArbiterSequence, fixture.paidArbiterSellerAmount, fixture.paidArbiterAmount);
+  const proofState = await build(paidArbiter, fixture.proofSequence, fixture.proofSellerAmount, fixture.proofArbiterAmount, Array.from(Buffer.from(fixture.paymentProofHex, 'hex')));
+  const buyerSignature = signArbitratedPoolAsBuyer(paidArbiter, funding.poolAmount, roles, buyer);
+  const sellerSignature = signArbitratedPoolAsSeller(paidArbiter, funding.poolAmount, roles, seller);
+  const arbiterSignature = signArbitratedPoolAsArbiter(paidArbiter, funding.poolAmount, roles, arbiter);
+  const finalBuyerSeller = mergeArbitratedPoolBuyerSellerSignatures(paidArbiter, funding.poolAmount, roles, buyerSignature, sellerSignature);
+  const finalBuyerArbiter = mergeArbitratedPoolBuyerArbiterSignatures(paidArbiter, funding.poolAmount, roles, buyerSignature, arbiterSignature);
+  const finalSellerArbiter = mergeArbitratedPoolSellerArbiterSignatures(paidArbiter, funding.poolAmount, roles, sellerSignature, arbiterSignature);
+  const values: Record<string, string> = {
+    LockHex: buildArbitratedPoolLock(roles).toHex(), FundingHex: funding.tx.toHex(), FundingTxID: funding.tx.id('hex'),
+    OpeningStateHex: opening.toHex(), OpeningStateTxID: opening.id('hex'), NegotiationStateHex: negotiation.toHex(), NegotiationStateTxID: negotiation.id('hex'),
+    PaidArbiterStateHex: paidArbiter.toHex(), PaidArbiterStateTxID: paidArbiter.id('hex'), ProofStateHex: proofState.toHex(), ProofStateTxID: proofState.id('hex'),
+    BuyerSignatureHex: Buffer.from(buyerSignature).toString('hex'), SellerSignatureHex: Buffer.from(sellerSignature).toString('hex'), ArbiterSignatureHex: Buffer.from(arbiterSignature).toString('hex'),
+    FinalBuyerSellerHex: finalBuyerSeller.toHex(), FinalBuyerArbiterHex: finalBuyerArbiter.toHex(), FinalSellerArbiterHex: finalSellerArbiter.toHex(),
+  };
+  for (const [key, value] of Object.entries(values)) console.log(`${key} ${value}`);
+};
+
+void main();

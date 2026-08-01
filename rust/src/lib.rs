@@ -1,8 +1,10 @@
+pub mod arbitrated_pool;
 mod error;
 mod multisig;
 mod types;
 mod version;
 
+pub use arbitrated_pool::*;
 pub use error::{MultisigError, Result};
 pub use multisig::Multisig;
 pub use types::*;
@@ -10,6 +12,274 @@ pub use version::{PROTOCOL, PROTOCOL_VERSION, RELEASE_VERSION, VERSION};
 
 use serde_wasm_bindgen as swbg;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn build_arbitrated_pool_lock_v4(roles: JsValue) -> std::result::Result<JsValue, JsValue> {
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let script = arbitrated_pool::build_arbitrated_pool_lock(&roles)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&script)?)
+}
+
+#[wasm_bindgen]
+pub fn build_arbitrated_pool_state_v4(input: JsValue) -> std::result::Result<JsValue, JsValue> {
+    let input: ArbitratedPoolStateInput = swbg::from_value(input)?;
+    let state = arbitrated_pool::build_arbitrated_pool_state(input)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&state)?)
+}
+
+#[wasm_bindgen]
+pub fn build_arbitrated_pool_funding_v4(
+    utxos: JsValue,
+    pool_amount: u64,
+    buyer_private_key: JsValue,
+    roles: JsValue,
+    fee_rate: u64,
+) -> std::result::Result<JsValue, JsValue> {
+    let utxos: Vec<Utxo> = swbg::from_value(utxos)?;
+    let buyer_private_key: PrivateKey = swbg::from_value(buyer_private_key)?;
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let result = arbitrated_pool::build_arbitrated_pool_funding_tx(
+        &utxos,
+        pool_amount,
+        &buyer_private_key,
+        &roles,
+        fee_rate,
+    )
+    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&result)?)
+}
+
+#[wasm_bindgen]
+pub fn build_arbitrated_pool_opening_state_v4(
+    funding_tx: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    lock_time: u32,
+    fee_rate: u64,
+) -> std::result::Result<JsValue, JsValue> {
+    let funding_tx: Transaction = swbg::from_value(funding_tx)?;
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let state = arbitrated_pool::build_arbitrated_pool_opening_state(
+        &funding_tx,
+        pool_amount,
+        roles,
+        lock_time,
+        fee_rate,
+    )
+    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&state)?)
+}
+
+#[wasm_bindgen]
+pub fn build_arbitrated_pool_final_state_v4(
+    input: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    let input: ArbitratedPoolStateInput = swbg::from_value(input)?;
+    let state = arbitrated_pool::build_arbitrated_pool_final_state(input)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&state)?)
+}
+
+fn wasm_sign_role(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    key: JsValue,
+    sign: fn(&Transaction, u64, &ArbitratedPoolRoles, &PrivateKey) -> Result<Vec<u8>>,
+) -> std::result::Result<JsValue, JsValue> {
+    let state: Transaction = swbg::from_value(state)?;
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let key: PrivateKey = swbg::from_value(key)?;
+    let signature = sign(&state, pool_amount, &roles, &key)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&signature)?)
+}
+
+#[wasm_bindgen]
+pub fn sign_arbitrated_pool_as_buyer_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    key: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_sign_role(
+        state,
+        pool_amount,
+        roles,
+        key,
+        arbitrated_pool::sign_arbitrated_pool_as_buyer,
+    )
+}
+
+#[wasm_bindgen]
+pub fn sign_arbitrated_pool_as_seller_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    key: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_sign_role(
+        state,
+        pool_amount,
+        roles,
+        key,
+        arbitrated_pool::sign_arbitrated_pool_as_seller,
+    )
+}
+
+#[wasm_bindgen]
+pub fn sign_arbitrated_pool_as_arbiter_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    key: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_sign_role(
+        state,
+        pool_amount,
+        roles,
+        key,
+        arbitrated_pool::sign_arbitrated_pool_as_arbiter,
+    )
+}
+
+fn wasm_verify_role(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    signature: JsValue,
+    verify: fn(&Transaction, u64, &ArbitratedPoolRoles, &[u8]) -> Result<bool>,
+) -> std::result::Result<bool, JsValue> {
+    let state: Transaction = swbg::from_value(state)?;
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let signature: Vec<u8> = swbg::from_value(signature)?;
+    verify(&state, pool_amount, &roles, &signature)
+        .map_err(|error| JsValue::from_str(&error.to_string()))
+}
+
+#[wasm_bindgen]
+pub fn verify_arbitrated_pool_buyer_signature_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    signature: JsValue,
+) -> std::result::Result<bool, JsValue> {
+    wasm_verify_role(
+        state,
+        pool_amount,
+        roles,
+        signature,
+        arbitrated_pool::verify_arbitrated_pool_buyer_signature,
+    )
+}
+
+#[wasm_bindgen]
+pub fn verify_arbitrated_pool_seller_signature_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    signature: JsValue,
+) -> std::result::Result<bool, JsValue> {
+    wasm_verify_role(
+        state,
+        pool_amount,
+        roles,
+        signature,
+        arbitrated_pool::verify_arbitrated_pool_seller_signature,
+    )
+}
+
+#[wasm_bindgen]
+pub fn verify_arbitrated_pool_arbiter_signature_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    signature: JsValue,
+) -> std::result::Result<bool, JsValue> {
+    wasm_verify_role(
+        state,
+        pool_amount,
+        roles,
+        signature,
+        arbitrated_pool::verify_arbitrated_pool_arbiter_signature,
+    )
+}
+
+type ArbitratedPoolMerge =
+    fn(&Transaction, u64, &ArbitratedPoolRoles, &[u8], &[u8]) -> Result<Transaction>;
+
+fn wasm_merge(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    first: JsValue,
+    second: JsValue,
+    merge: ArbitratedPoolMerge,
+) -> std::result::Result<JsValue, JsValue> {
+    let state: Transaction = swbg::from_value(state)?;
+    let roles: ArbitratedPoolRoles = swbg::from_value(roles)?;
+    let first: Vec<u8> = swbg::from_value(first)?;
+    let second: Vec<u8> = swbg::from_value(second)?;
+    let merged = merge(&state, pool_amount, &roles, &first, &second)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    Ok(swbg::to_value(&merged)?)
+}
+
+#[wasm_bindgen]
+pub fn merge_arbitrated_pool_buyer_seller_signatures_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    buyer: JsValue,
+    seller: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_merge(
+        state,
+        pool_amount,
+        roles,
+        buyer,
+        seller,
+        arbitrated_pool::merge_arbitrated_pool_buyer_seller_signatures,
+    )
+}
+
+#[wasm_bindgen]
+pub fn merge_arbitrated_pool_buyer_arbiter_signatures_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    buyer: JsValue,
+    arbiter: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_merge(
+        state,
+        pool_amount,
+        roles,
+        buyer,
+        arbiter,
+        arbitrated_pool::merge_arbitrated_pool_buyer_arbiter_signatures,
+    )
+}
+
+#[wasm_bindgen]
+pub fn merge_arbitrated_pool_seller_arbiter_signatures_v4(
+    state: JsValue,
+    pool_amount: u64,
+    roles: JsValue,
+    seller: JsValue,
+    arbiter: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    wasm_merge(
+        state,
+        pool_amount,
+        roles,
+        seller,
+        arbiter,
+        arbitrated_pool::merge_arbitrated_pool_seller_arbiter_signatures,
+    )
+}
 
 #[wasm_bindgen]
 pub fn create_multisig(
@@ -145,6 +415,7 @@ impl MultisigWasm {
     }
 }
 
+#[cfg(not(feature = "wasm-test"))]
 #[wasm_bindgen(start)]
 pub fn main() {
     console_error_panic_hook::set_once();

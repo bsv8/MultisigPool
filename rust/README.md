@@ -1,13 +1,14 @@
 # Keymaster Multisig Rust Library
 
-Rust implementation of the Keymaster Multisig library using bsv-wasm for cryptographic operations.
+Rust v4 implementation of the Keymaster Multisig library using native Rust cryptography and WebAssembly bindings.
 
 ## Features
 
 - **Multi-signature Support**: Create M-of-N multi-signature scripts
 - **Script Generation**: Generate P2MS (Pay-to-Multi-Signature) locking scripts
 - **Signature Creation**: Generate individual and combined signatures
-- **Cross-Validation**: Compatible with TypeScript and Golang implementations
+- **Arbitrated Pool**: Buyer/Seller/Arbiter v4 funding, state, signing, verification, and merge APIs
+- **Cross-Validation**: Byte-compatible with the TypeScript and Go implementations
 - **WASM Support**: Can be compiled to WebAssembly for browser usage
 
 ## Usage

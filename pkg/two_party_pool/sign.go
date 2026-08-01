@@ -7,7 +7,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 func signAs(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, key *ec.PrivateKey) ([]byte, error) {

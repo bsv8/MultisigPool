@@ -18,20 +18,20 @@ import {
 } from './release-plan.mjs';
 
 test('正常发布步骤顺序固定', () => {
-  const plan = buildReleasePlan({ resumeFrom: null, goVersion: '3.0.0', rustVersion: '3.0.0' });
+  const plan = buildReleasePlan({ resumeFrom: null, goVersion: '4.0.0', rustVersion: '4.0.0' });
   assert.deepEqual(plan.steps, ['preflight', 'create-local-tags', 'publish-npm', 'publish-rust', 'push-tags', 'verify']);
-  assert.equal(plan.goTag, 'v3.0.0');
-  assert.equal(plan.rustTag, 'rust-v3.0.0');
+  assert.equal(plan.goTag, 'v4.0.0');
+  assert.equal(plan.rustTag, 'rust-v4.0.0');
 });
 
 test('恢复点只选择施工单规定的后续步骤', () => {
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'rust', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'rust', goVersion: '4.0.0', rustVersion: '4.0.0' }).steps, [
     'preflight', 'verify-npm', 'publish-rust', 'push-tags', 'verify',
   ]);
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'tags', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'tags', goVersion: '4.0.0', rustVersion: '4.0.0' }).steps, [
     'preflight', 'verify-registries', 'verify-local-tags', 'push-tags', 'verify',
   ]);
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'verify', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'verify', goVersion: '4.0.0', rustVersion: '4.0.0' }).steps, [
     'preflight', 'verify-release',
   ]);
 });
@@ -40,8 +40,8 @@ test('恢复参数、版本和 tag 推导不接受隐式值', () => {
   assert.deepEqual(parseReleaseArguments([]), { resumeFrom: null });
   assert.deepEqual(parseReleaseArguments(['--resume-from', 'rust']), { resumeFrom: 'rust' });
   assert.throws(() => parseReleaseArguments(['--resume-from', 'npm']), /Usage/);
-  assert.throws(() => deriveReleaseTags('3', '3.0.0'), /Invalid Go release version/);
-  assert.throws(() => buildReleasePlan({ resumeFrom: 'unknown', goVersion: '3.0.0', rustVersion: '3.0.0' }), /Unknown resume point/);
+  assert.throws(() => deriveReleaseTags('3', '4.0.0'), /Invalid Go release version/);
+  assert.throws(() => buildReleasePlan({ resumeFrom: 'unknown', goVersion: '4.0.0', rustVersion: '4.0.0' }), /Unknown resume point/);
 });
 
 test('发布前置条件的纯校验拒绝非 main、脏工作树、未推送 HEAD 和已存在产物', () => {
@@ -117,16 +117,16 @@ test('恢复入口拒绝不匹配的 tag、registry 和未知状态', () => {
 });
 
 test('registry 只有明确的 404 才表示版本不存在', () => {
-  assert.equal(classifyRegistryStatus(404, 'npm registry', 'pkg@3.0.0'), 'absent');
-  assert.equal(classifyRegistryStatus(200, 'npm registry', 'pkg@3.0.0'), 'present');
-  assert.throws(() => classifyRegistryStatus(503, 'npm registry', 'pkg@3.0.0'), /Unexpected npm registry response/);
+  assert.equal(classifyRegistryStatus(404, 'npm registry', 'pkg@4.0.0'), 'absent');
+  assert.equal(classifyRegistryStatus(200, 'npm registry', 'pkg@4.0.0'), 'present');
+  assert.throws(() => classifyRegistryStatus(503, 'npm registry', 'pkg@4.0.0'), /Unexpected npm registry response/);
 });
 
 test('统一发布脚本不会吞掉 registry 异常并使用 Go Proxy 转义路径', () => {
   const script = fs.readFileSync(new URL('./release-all.sh', import.meta.url), 'utf8');
   assert.doesNotMatch(script, /case\s+"\$\(classify_registry_status/);
   assert.match(script, /if ! registry_state="\$\(classify_registry_status/);
-  assert.match(script, /GO_PROXY_MODULE_PATH='github\.com\/bsv8\/!multisig!pool\/v3'/);
+  assert.match(script, /GO_PROXY_MODULE_PATH='github\.com\/bsv8\/!multisig!pool\/v4'/);
   assert.match(script, /import pool \\\"\$GO_MODULE_PATH\/pkg\\\"/);
   assert.match(script, /GOWORK=off go mod tidy && GOWORK=off go build -buildvcs=false/);
   assert.match(script, /--user-agent "\$RELEASE_USER_AGENT"/);
@@ -139,7 +139,7 @@ test('统一发布脚本不会吞掉 registry 异常并使用 Go Proxy 转义路
 test('npm registry 必须提供当前 commit 的 gitHead 并匹配产物 integrity', () => {
   const common = {
     expectedName: 'keymaster-multisig-pool',
-    expectedVersion: '3.0.0',
+    expectedVersion: '4.0.0',
     expectedCommit: 'fbde8f15da1c5d9e715e8c3d46d0b3c97c6e0041',
     expectedIntegrity: 'sha512-local-artifact',
   };
@@ -163,7 +163,7 @@ test('npm registry 必须提供当前 commit 的 gitHead 并匹配产物 integri
 
 test('crates.io registry 必须使用当前版本响应结构并提供合法 checksum', () => {
   const expectedName = 'keymaster-multisig-rust';
-  const expectedVersion = '3.0.0';
+  const expectedVersion = '4.0.0';
   const checksum = 'a'.repeat(64);
   const common = { expectedName, expectedVersion };
 
@@ -174,11 +174,11 @@ test('crates.io registry 必须使用当前版本响应结构并提供合法 che
   assert.throws(() => validateCratesRegistryMetadata({
     ...common,
     metadata: { crate: { id: expectedName }, version: { num: expectedVersion, checksum } },
-  }), /unexpected package: undefined@3\.0\.0/);
+  }), /unexpected package: undefined@4\.0\.0/);
   assert.throws(() => validateCratesRegistryMetadata({
     ...common,
     metadata: { version: { crate: 'other-crate', num: expectedVersion, checksum } },
-  }), /unexpected package: other-crate@3\.0\.0/);
+  }), /unexpected package: other-crate@4\.0\.0/);
   assert.throws(() => validateCratesRegistryMetadata({
     ...common,
     metadata: { version: { crate: expectedName, num: expectedVersion, checksum: 'invalid' } },
@@ -228,8 +228,8 @@ test('从目录发布时 npm 会把当前 Git commit 放入 registry metadata', 
   const publishRequest = requests.find(({ method }) => method === 'PUT');
   assert.ok(publishRequest, 'npm did not send a publish request');
   const payload = JSON.parse(publishRequest.body);
-  assert.equal(payload.versions?.['3.0.0']?.gitHead, expectedCommit);
-  assert.match(payload.versions?.['3.0.0']?.dist?.integrity ?? '', /^sha512-/);
+  assert.equal(payload.versions?.['4.0.0']?.gitHead, expectedCommit);
+  assert.match(payload.versions?.['4.0.0']?.dist?.integrity ?? '', /^sha512-/);
 });
 
 test('Cargo VCS 元数据省略 dirty 时表示干净产物', () => {

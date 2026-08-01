@@ -9,13 +9,13 @@ import (
 	"os"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	pool "github.com/bsv8/MultisigPool/v3/pkg/arbitrated_pool"
-	"github.com/bsv8/MultisigPool/v3/pkg/libs"
+	pool "github.com/bsv8/MultisigPool/v4/pkg/arbitrated_pool"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 const (
 	testnetAPIBase = "https://api.whatsonchain.com/v1/bsv/test"
-	feeRate        = 0.5
+	feeRate        = 1
 	lockOffset     = 5
 )
 
@@ -133,11 +133,20 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("build funding transaction: %w", err)
 	}
-	rate := pool.FeeSatPerKB(feeRate * 1000)
+	rate := pool.FeeSatPerKB(feeRate)
 	state, err := pool.BuildArbitratedPoolOpeningState(funding.Tx.TxID().CloneBytes(), funding.PoolOutputIndex, funding.PoolAmount, roles, height+lockOffset, rate)
 	if err != nil {
 		return fmt.Errorf("build opening state: %w", err)
 	}
+	source := state.Inputs[0].SourceTxOutput()
+	if source == nil {
+		return fmt.Errorf("opening state source output is required")
+	}
+	paidState, err := pool.BuildArbitratedPoolState(pool.StateInput{Protocol: pool.Protocol, Version: pool.Version, PreviousRawTx: state.Bytes(), PreviousSourceOutput: source, Sequence: 3, SellerAmount: 100, ArbiterAmount: 50, PoolAmount: poolAmount, Roles: roles, FeeRate: rate})
+	if err != nil {
+		return fmt.Errorf("build paid arbiter state: %w", err)
+	}
+	state = paidState
 	buyerSignature, err := pool.SignArbitratedPoolAsBuyer(state, poolAmount, roles, buyer)
 	if err != nil {
 		return fmt.Errorf("sign as buyer: %w", err)
@@ -162,7 +171,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("merge seller and arbiter signatures: %w", err)
 	}
-	fmt.Printf("BuyerAddress %s\nBlockHeight %d\nPoolAmount %d\nFundingTxID %s\nFundingHex %s\nStateHex %s\nFinalBuyerSellerHex %s\nFinalBuyerArbiterHex %s\nFinalSellerArbiterHex %s\n", buyerAddress.AddressString, height, poolAmount, funding.Tx.TxID().String(), hex.EncodeToString(funding.Tx.Bytes()), hex.EncodeToString(state.Bytes()), hex.EncodeToString(buyerSeller.Bytes()), hex.EncodeToString(buyerArbiter.Bytes()), hex.EncodeToString(sellerArbiter.Bytes()))
+	fmt.Printf("BuyerAddress %s\nBlockHeight %d\nPoolAmount %d\nBuyerAmount %d\nSellerAmount %d\nArbiterAmount %d\nFundingTxID %s\nFundingHex %s\nStateHex %s\nFinalBuyerSellerHex %s\nFinalBuyerArbiterHex %s\nFinalSellerArbiterHex %s\n", buyerAddress.AddressString, height, poolAmount, state.Outputs[0].Satoshis, state.Outputs[1].Satoshis, state.Outputs[2].Satoshis, funding.Tx.TxID().String(), hex.EncodeToString(funding.Tx.Bytes()), hex.EncodeToString(state.Bytes()), hex.EncodeToString(buyerSeller.Bytes()), hex.EncodeToString(buyerArbiter.Bytes()), hex.EncodeToString(sellerArbiter.Bytes()))
 	return nil
 }
 

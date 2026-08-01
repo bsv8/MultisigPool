@@ -1,10 +1,10 @@
 [package]
 name = "keymaster-multisig-rust"
-version = "3.0.0"
+version = "4.0.0"
 edition = "2021"
 authors = ["Keymaster Team"]
 license = "MIT"
-description = "Rust implementation of Keymaster Multisig using bsv-wasm"
+description = "Rust v4 implementation of Keymaster Multisig with native and WebAssembly APIs"
 repository = "https://github.com/bsv8/MultisigPool"
 keywords = ["bitcoin", "bsv", "multisig", "cryptography"]
 categories = ["cryptography::cryptocurrencies"]
@@ -22,13 +22,16 @@ thiserror = "1.0"
 console_error_panic_hook = "0.1"
 hex = "0.4"
 sha2 = "0.10"
+ripemd = "0.1"
 k256 = { version = "0.13", features = ["std"] }
+getrandom = { version = "0.2", features = ["js"] }
 
 [features]
 default = []
 std = []
 wasm = []
 serde = []
+wasm-test = []
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

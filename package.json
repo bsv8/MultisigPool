@@ -1,7 +1,7 @@
 {
   "name": "keymaster-multisig-pool",
-  "version": "3.0.0",
-  "description": "A Buyer-Seller-Arbiter multisig pool implementation with TypeScript and Go support",
+  "version": "4.0.0",
+  "description": "A Buyer-Seller-Arbiter multisig pool implementation with TypeScript, Go, and Rust support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -53,7 +53,9 @@
     "arbiter",
     "blockchain",
     "typescript",
-    "golang"
+    "golang",
+    "rust",
+    "wasm"
   ],
   "repository": {
     "type": "git",

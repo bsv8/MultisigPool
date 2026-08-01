@@ -41,8 +41,8 @@ fn run() -> AnyResult<()> {
     println!("=== Rust Cross-Validation Runner ===\n");
 
     let fixture = load_fixture()?;
-    if fixture.protocol != "bitfs.pool.v3" || fixture.version != 3 {
-        return Err("unsupported pool protocol: expected bitfs.pool.v3 v3".into());
+    if fixture.protocol != "bitfs.pool.v4" || fixture.version != 4 {
+        return Err("unsupported pool protocol: expected bitfs.pool.v4 v4".into());
     }
     let buyer_priv = PrivateKey::from_hex(&fixture.buyer_priv_hex)?;
     let seller_priv = PrivateKey::from_hex(&fixture.seller_priv_hex)?;

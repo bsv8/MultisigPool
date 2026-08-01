@@ -1,5 +1,5 @@
 use crate::error::{MultisigError, Result};
-use crate::types::{PrivateKey, PublicKey, Transaction};
+use crate::types::{encode_varint, PrivateKey, PublicKey, Transaction};
 use k256::{
     ecdsa::{
         signature::{hazmat::PrehashSigner, SignatureEncoding},
@@ -13,33 +13,6 @@ use sha2::{Digest, Sha256};
 const OP_0: u8 = 0x00;
 const OP_CHECKMULTISIG: u8 = 0xae;
 const SIGHASH_ALL_FORKID: u8 = 0x41;
-
-/// Variable length integer encoding (Bitcoin style)
-#[derive(Debug, Clone)]
-struct VarInt(pub u64);
-
-impl VarInt {
-    pub fn serialize(&self) -> Vec<u8> {
-        match self.0 {
-            0x00..=0xFC => vec![self.0 as u8],
-            0xFD..=0xFFFF => {
-                let mut v = vec![0xFD];
-                v.extend_from_slice(&(self.0 as u16).to_le_bytes());
-                v
-            }
-            0x10000..=0xFFFFFFFF => {
-                let mut v = vec![0xFE];
-                v.extend_from_slice(&(self.0 as u32).to_le_bytes());
-                v
-            }
-            _ => {
-                let mut v = vec![0xFF];
-                v.extend_from_slice(&self.0.to_le_bytes());
-                v
-            }
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Multisig {
@@ -149,51 +122,60 @@ impl Multisig {
     }
 
     fn calculate_signature_hash(&self, tx: &Transaction, input_index: usize) -> Result<Vec<u8>> {
-        // Simplified signature hash calculation for Bitcoin SV
-        let mut hash_input = Vec::new();
-        hash_input.extend_from_slice(&tx.version.to_le_bytes());
-
-        // Serialize inputs
-        let inputs_count = VarInt(tx.inputs.len() as u64);
-        hash_input.extend(inputs_count.serialize());
-
-        for (i, input) in tx.inputs.iter().enumerate() {
-            hash_input.extend_from_slice(
-                &hex::decode(&input.source_txid).map_err(|_| {
-                    MultisigError::TransactionError("Invalid source txid".to_string())
-                })?,
-            );
-            hash_input.extend_from_slice(&input.source_output_index.to_le_bytes());
-
-            if i == input_index {
-                // For the input being signed, use empty unlocking script for SIGHASH calculation
-                hash_input.extend(VarInt(0).serialize());
-            } else {
-                // For other inputs, use placeholder script
-                hash_input.extend(VarInt(0).serialize());
+        if input_index >= tx.inputs.len() {
+            return Err(MultisigError::TransactionError(
+                "Input index out of bounds".to_string(),
+            ));
+        }
+        let source = tx.inputs[input_index]
+            .source_output
+            .as_ref()
+            .ok_or_else(|| {
+                MultisigError::TransactionError("Source output is required".to_string())
+            })?;
+        let hash256 = |value: &[u8]| -> [u8; 32] {
+            let first = Sha256::digest(value);
+            Sha256::digest(first).into()
+        };
+        let mut prevouts = Vec::new();
+        let mut sequences = Vec::new();
+        for input in &tx.inputs {
+            let mut txid = hex::decode(&input.source_txid)
+                .map_err(|_| MultisigError::TransactionError("Invalid source txid".to_string()))?;
+            if txid.len() != 32 {
+                return Err(MultisigError::TransactionError(
+                    "Invalid source txid length".to_string(),
+                ));
             }
-
-            hash_input.extend_from_slice(&input.sequence.to_le_bytes());
+            txid.reverse();
+            prevouts.extend(txid);
+            prevouts.extend_from_slice(&input.source_output_index.to_le_bytes());
+            sequences.extend_from_slice(&input.sequence.to_le_bytes());
         }
-
-        // Serialize outputs
-        let outputs_count = VarInt(tx.outputs.len() as u64);
-        hash_input.extend(outputs_count.serialize());
-
+        let mut outputs = Vec::new();
         for output in &tx.outputs {
-            hash_input.extend_from_slice(&output.satoshis.to_le_bytes());
-            let script_len = VarInt(output.locking_script.len() as u64);
-            hash_input.extend(script_len.serialize());
-            hash_input.extend(&output.locking_script);
+            outputs.extend_from_slice(&output.satoshis.to_le_bytes());
+            outputs.extend(encode_varint(output.locking_script.len() as u64));
+            outputs.extend(&output.locking_script);
         }
-
-        hash_input.extend_from_slice(&tx.lock_time.to_le_bytes());
-        hash_input.push(self.sig_hash_type);
-
-        // Double SHA256 for Bitcoin
-        let hash1 = Sha256::digest(&hash_input);
-        let hash2 = Sha256::digest(hash1);
-        Ok(hash2.to_vec())
+        let input = &tx.inputs[input_index];
+        let mut outpoint_txid = hex::decode(&input.source_txid)
+            .map_err(|_| MultisigError::TransactionError("Invalid source txid".to_string()))?;
+        outpoint_txid.reverse();
+        let mut preimage = Vec::new();
+        preimage.extend_from_slice(&tx.version.to_le_bytes());
+        preimage.extend(hash256(&prevouts));
+        preimage.extend(hash256(&sequences));
+        preimage.extend(outpoint_txid);
+        preimage.extend_from_slice(&input.source_output_index.to_le_bytes());
+        preimage.extend(encode_varint(source.locking_script.len() as u64));
+        preimage.extend(&source.locking_script);
+        preimage.extend_from_slice(&source.satoshis.to_le_bytes());
+        preimage.extend_from_slice(&input.sequence.to_le_bytes());
+        preimage.extend(hash256(&outputs));
+        preimage.extend_from_slice(&tx.lock_time.to_le_bytes());
+        preimage.extend_from_slice(&(self.sig_hash_type as u32).to_le_bytes());
+        Ok(hash256(&preimage).to_vec())
     }
 
     fn generate_signature(&self, sighash: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>> {
@@ -202,9 +184,12 @@ impl Multisig {
             .map_err(|_| MultisigError::InvalidPrivateKey)?;
 
         let signing_key = SigningKey::from(secret_key);
-        let signature: EcdsaSignature = signing_key
+        let mut signature: EcdsaSignature = signing_key
             .sign_prehash(sighash)
             .map_err(|_| MultisigError::SignatureError("Failed to create signature".to_string()))?;
+        if let Some(normalized) = signature.normalize_s() {
+            signature = normalized;
+        }
 
         // Convert to DER format and add SIGHASH type
         let der_sig = signature.to_der();
@@ -271,7 +256,13 @@ mod tests {
         ];
         let transaction = Transaction::new(
             1,
-            vec![TransactionInput::new("aa".repeat(32), 0, 1)],
+            vec![TransactionInput {
+                source_txid: "aa".repeat(32),
+                source_output_index: 0,
+                unlocking_script: Vec::new(),
+                sequence: 1,
+                source_output: Some(TransactionOutput::new(1000, vec![0x51])),
+            }],
             vec![TransactionOutput::new(1000, vec![0x51])],
             0,
         );

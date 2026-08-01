@@ -5,7 +5,7 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 func sign(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, key *ec.PrivateKey, expected *ec.PublicKey, role string) ([]byte, error) {
@@ -26,6 +26,13 @@ func sign(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, k
 		return nil, err
 	}
 	if err := requireSource(state, poolAmount, lock); err != nil {
+		return nil, err
+	}
+	_, buyer, seller, arbiter, err := scripts(roles)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateStateOutputs(state, roles, buyer, seller, arbiter); err != nil {
 		return nil, err
 	}
 	copy, err := clone(state)

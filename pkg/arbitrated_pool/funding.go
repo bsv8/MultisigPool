@@ -7,8 +7,7 @@ import (
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
-	"math"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 type FundingTxResult struct {
@@ -19,15 +18,12 @@ type FundingTxResult struct {
 }
 
 // BuildArbitratedPoolFundingTx 使用 Buyer UTXO 创建 2-of-3 仲裁池。
-func BuildArbitratedPoolFundingTx(utxos []libs.UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles ArbitratedPoolRoles, isMain bool, feeRate float64) (*FundingTxResult, error) {
+func BuildArbitratedPoolFundingTx(utxos []libs.UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles ArbitratedPoolRoles, isMain bool, feeRate FeeSatPerKB) (*FundingTxResult, error) {
 	if len(utxos) == 0 {
 		return nil, fmt.Errorf("buyer UTXOs are required")
 	}
 	if poolAmount == 0 {
 		return nil, fmt.Errorf("pool amount must be positive")
-	}
-	if feeRate < 0 {
-		return nil, fmt.Errorf("fee rate must not be negative")
 	}
 	if err := validateRoles(roles); err != nil {
 		return nil, err
@@ -75,9 +71,9 @@ func BuildArbitratedPoolFundingTx(utxos []libs.UTXO, poolAmount uint64, buyerPri
 		}
 		result.Inputs[i].UnlockingScript = s
 	}
-	fee := uint64(math.Ceil(float64(result.Size()) * feeRate / 1000))
-	if fee == 0 {
-		fee = 1
+	fee, err := feeSat(result.Size(), feeRate)
+	if err != nil {
+		return nil, err
 	}
 	if fee > ^uint64(0)-poolAmount || total < poolAmount+fee {
 		return nil, fmt.Errorf("buyer balance is insufficient for pool amount and fee")

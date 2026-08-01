@@ -1,4 +1,4 @@
-// Package pkg provides the v3 multisig-pool protocol for Bitcoin SV transactions.
+// Package pkg provides the v4 multisig-pool protocol for Bitcoin SV transactions.
 package pkg
 
 import (
@@ -6,10 +6,10 @@ import (
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
-	"github.com/bsv8/MultisigPool/v3/internal/versioninfo"
-	arbitrated "github.com/bsv8/MultisigPool/v3/pkg/arbitrated_pool"
-	"github.com/bsv8/MultisigPool/v3/pkg/libs"
-	twoParty "github.com/bsv8/MultisigPool/v3/pkg/two_party_pool"
+	"github.com/bsv8/MultisigPool/v4/internal/versioninfo"
+	arbitrated "github.com/bsv8/MultisigPool/v4/pkg/arbitrated_pool"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
+	twoParty "github.com/bsv8/MultisigPool/v4/pkg/two_party_pool"
 )
 
 const (
@@ -83,7 +83,7 @@ func BuildArbitratedPoolLock(roles ArbitratedPoolRoles) (*script.Script, error) 
 	return arbitrated.BuildArbitratedPoolLock(roles)
 }
 
-func BuildArbitratedPoolFundingTx(utxos []UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles ArbitratedPoolRoles, isMain bool, feeRate float64) (*ArbitratedPoolFundingResult, error) {
+func BuildArbitratedPoolFundingTx(utxos []UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles ArbitratedPoolRoles, isMain bool, feeRate FeeSatPerKB) (*ArbitratedPoolFundingResult, error) {
 	return arbitrated.BuildArbitratedPoolFundingTx(utxos, poolAmount, buyerPrivateKey, roles, isMain, feeRate)
 }
 

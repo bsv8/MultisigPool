@@ -1,4 +1,4 @@
-# TwoPartyPool v3 规范
+# TwoPartyPool v4 规范
 
 2-of-2 锁定脚本公钥顺序固定为 `[Buyer, Seller]`。Buyer 是唯一建池出资方，Seller 是结算收款方。
 

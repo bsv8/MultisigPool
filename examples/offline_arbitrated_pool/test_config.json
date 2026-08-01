@@ -1,9 +1,10 @@
 {
-  "protocol": "bitfs.pool.v3",
-  "version": 3,
+  "protocol": "bitfs.pool.v4",
+  "version": 4,
   "buyer_priv_hex": "2796e78fad7d383fa5236607eba52d9a1904325daf9b4da3d77be5ad15ab1dae",
   "seller_priv_hex": "e6d4d7685894d2644d1f4bf31c0b87f3f6aa8a3d7d4091eaa375e81d6c9f9091",
   "arbiter_priv_hex": "a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c",
   "sequence": 2,
-  "seller_amount": 1111
+  "seller_amount": 1111,
+  "arbiter_amount": 222
 }

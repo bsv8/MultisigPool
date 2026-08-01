@@ -21,11 +21,21 @@ func verify(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles,
 	if state == nil || len(state.Inputs) != 1 || state.Inputs[0] == nil {
 		return false, fmt.Errorf("state must have exactly one input")
 	}
+	if state.Inputs[0].UnlockingScript != nil && len(state.Inputs[0].UnlockingScript.Bytes()) != 0 {
+		return false, fmt.Errorf("state must have an empty unlocking script")
+	}
 	lock, err := BuildArbitratedPoolLock(roles)
 	if err != nil {
 		return false, err
 	}
 	if err := requireSource(state, poolAmount, lock); err != nil {
+		return false, err
+	}
+	_, buyer, seller, arbiter, err := scripts(roles)
+	if err != nil {
+		return false, err
+	}
+	if err := validateStateOutputs(state, roles, buyer, seller, arbiter); err != nil {
 		return false, err
 	}
 	copy, err := clone(state)

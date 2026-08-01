@@ -1,19 +1,19 @@
-# MultisigPool v3
+# MultisigPool v4
 
-MultisigPool v3 是 Buyer / Seller / Arbiter 角色明确的 BSV 多签池实现，提供 TypeScript、Go 和通用 Rust 多签能力。
+MultisigPool v4 是 Buyer / Seller / Arbiter 角色明确的 BSV 多签池实现，提供 TypeScript、Go 和 Rust 完整仲裁池能力。
 
 角色和链上顺序固定如下：
 
 - 2-of-2：`[Buyer, Seller]`
 - 2-of-3：`[Buyer, Seller, Arbiter]`
-- 状态交易：`output[0] = Buyer`，`output[1] = Seller`
-- Buyer 提供建池 UTXO，并承担状态交易手续费；Arbiter 不占用资金输出。
+- 仲裁池状态交易：`output[0] = Buyer`，`output[1] = Seller`，`output[2] = Arbiter`，付款证明位于可选的 `output[3]`
+- Buyer 提供建池 UTXO，并承担状态交易手续费；Arbiter 初始金额为 0，但固定占用 `output[2]`。
 
-协议标识是 `bitfs.pool.v3`，协议版本是 `3`。v3 是破坏性切换，不读取、迁移或兼容旧 v2 池。
+协议标识是 `bitfs.pool.v4`，协议版本是 `4`。v4 是破坏性切换，不读取、迁移或兼容旧 v2/v3 池。
 
 ## 版本与发布
 
-版本事实源只有 [`release/versions.json`](release/versions.json)。协议版本与包发布版本含义不同：协议为 `bitfs.pool.v3` / `3`，npm、Go 与 Rust 发布版本统一为 `3.0.0`。
+版本事实源只有 [`release/versions.json`](release/versions.json)。协议版本与包发布版本含义不同：协议为 `bitfs.pool.v4` / `4`，npm、Go 与 Rust 发布版本统一为 `4.0.0`。
 
 修改版本清单后执行 `node scripts/release-versions.mjs sync`，审查生成的 Go、TypeScript、Rust 版本文件及包锁文件。只读检查命令是 `node scripts/release-versions.mjs check`。
 
@@ -37,7 +37,7 @@ const lockingScript = buildArbitratedPoolLock(roles)
 
 ## Go
 
-Go module 路径是 `github.com/bsv8/MultisigPool/v3`。公共聚合包位于 `github.com/bsv8/MultisigPool/v3/pkg`，角色值对象位于 `pkg/two_party_pool` 和 `pkg/arbitrated_pool`，不保留旧函数别名。
+Go module 路径是 `github.com/bsv8/MultisigPool/v4`。公共聚合包位于 `github.com/bsv8/MultisigPool/v4/pkg`，角色值对象位于 `pkg/two_party_pool` 和 `pkg/arbitrated_pool`，不保留旧函数别名。
 
 ```go
 roles := arbitrated_pool.ArbitratedPoolRoles{
@@ -54,4 +54,4 @@ npm test -- --runInBand
 go test ./...
 ```
 
-Rust 目录只保留通用 `m-of-n` 数学和脚本能力；涉及池角色的交叉验证使用同一套 v3 角色顺序。
+Rust 目录提供通用 `m-of-n` 能力和完整 v4 仲裁池交易 API；涉及池角色的交叉验证使用同一套 v4 角色顺序。

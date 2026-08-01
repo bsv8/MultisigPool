@@ -1,6 +1,6 @@
-# v3 测试
+# v4 测试
 
-TypeScript 测试位于 `tests/two_party_pool` 和 `tests/arbitrated_pool`，分别验证 2-of-2 的 `[Buyer, Seller]`、2-of-3 的 `[Buyer, Seller, Arbiter]`、固定输出顺序、三种签名组合和不可变输入。
+TypeScript 测试位于 `tests/two_party_pool` 和 `tests/arbitrated_pool`，覆盖仲裁池的三资金输出、绝对仲裁费、付款证明索引、严格输出校验、金额守恒、手续费、三种签名组合和不可变输入。
 
 ```bash
 npm test -- --runInBand

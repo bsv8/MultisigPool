@@ -7,8 +7,8 @@ import (
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
-	"github.com/bsv8/MultisigPool/v3/pkg/libs"
-	pool "github.com/bsv8/MultisigPool/v3/pkg/two_party_pool"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
+	pool "github.com/bsv8/MultisigPool/v4/pkg/two_party_pool"
 )
 
 func fee(size int, rate float64) uint64 {

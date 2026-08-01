@@ -8,7 +8,7 @@ import (
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 // FundingTxResult 是建池交易及其资金池输出的显式结果。

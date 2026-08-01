@@ -7,7 +7,7 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 // BuildTwoPartyPoolLock 构建固定为 [Buyer, Seller] 的 2-of-2 锁定脚本。

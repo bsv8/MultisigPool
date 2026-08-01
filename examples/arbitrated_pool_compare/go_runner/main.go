@@ -2,59 +2,72 @@ package main
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
-	pool "github.com/bsv8/MultisigPool/v3/pkg/arbitrated_pool"
+	pool "github.com/bsv8/MultisigPool/v4/pkg/arbitrated_pool"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
+type fixture struct {
+	Protocol                 string      `json:"protocol"`
+	Version                  uint32      `json:"version"`
+	FeeRate                  uint64      `json:"feeRate"`
+	BuyerPrivHex             string      `json:"buyerPrivHex"`
+	SellerPrivHex            string      `json:"sellerPrivHex"`
+	ArbiterPrivHex           string      `json:"arbiterPrivHex"`
+	BuyerUtxos               []libs.UTXO `json:"buyerUtxos"`
+	PoolAmount               uint64      `json:"poolAmount"`
+	LockTime                 uint32      `json:"lockTime"`
+	NegotiationSequence      uint32      `json:"negotiationSequence"`
+	NegotiationSellerAmount  uint64      `json:"negotiationSellerAmount"`
+	NegotiationArbiterAmount uint64      `json:"negotiationArbiterAmount"`
+	PaidArbiterSequence      uint32      `json:"paidArbiterSequence"`
+	PaidArbiterSellerAmount  uint64      `json:"paidArbiterSellerAmount"`
+	PaidArbiterAmount        uint64      `json:"paidArbiterAmount"`
+	ProofSequence            uint32      `json:"proofSequence"`
+	ProofSellerAmount        uint64      `json:"proofSellerAmount"`
+	ProofArbiterAmount       uint64      `json:"proofArbiterAmount"`
+	PaymentProofHex          string      `json:"paymentProofHex"`
+}
+
+func must[T any](value T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
 func main() {
-	buyer, err := ec.PrivateKeyFromHex("a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c")
-	if err != nil {
+	data := must(os.ReadFile("testdata/arbitrated_pool_v4_fixture.json"))
+	var config fixture
+	if err := json.Unmarshal(data, &config); err != nil {
 		panic(err)
 	}
-	seller, err := ec.PrivateKeyFromHex("903b1b2c396f17203fa83444d72bf5c666119d9d681eb715520f99ae6f92322c")
-	if err != nil {
-		panic(err)
+	if config.Protocol != pool.Protocol || config.Version != pool.Version {
+		panic("fixture protocol does not match v4")
 	}
-	arbiter, err := ec.PrivateKeyFromHex("a2d2ca4c19e3c560792ca751842c29b9da94be09f712a7f9ba7c66e64a354829")
-	if err != nil {
-		panic(err)
-	}
+	buyer := must(ec.PrivateKeyFromHex(config.BuyerPrivHex))
+	seller := must(ec.PrivateKeyFromHex(config.SellerPrivHex))
+	arbiter := must(ec.PrivateKeyFromHex(config.ArbiterPrivHex))
 	roles := pool.ArbitratedPoolRoles{Buyer: buyer.PubKey(), Seller: seller.PubKey(), Arbiter: arbiter.PubKey()}
-	state, err := tx.NewTransactionFromHex("0100000001193bf65040f4c309fb4834a195eab9753fd3b5162551c10aade89d99f5afa671000000000001000000021a4e0000000000001976a914a8d0cb37061679d0523314d882d81b989254df7b88ac00000000000000001976a9147e06a09c32ea06e80745cbfae60036968b64238888ac00000000")
-	if err != nil {
-		panic(err)
+	funding := must(pool.BuildArbitratedPoolFundingTx(config.BuyerUtxos, config.PoolAmount, buyer, roles, false, pool.FeeSatPerKB(config.FeeRate)))
+	opening := must(pool.BuildArbitratedPoolOpeningState(funding.Tx.TxID().CloneBytes(), funding.PoolOutputIndex, funding.PoolAmount, roles, config.LockTime, pool.FeeSatPerKB(config.FeeRate)))
+	lock := must(pool.BuildArbitratedPoolLock(roles))
+	build := func(previous *tx.Transaction, sequence uint32, sellerAmount, arbiterAmount uint64, proof []byte) *tx.Transaction {
+		return must(pool.BuildArbitratedPoolState(pool.StateInput{Protocol: config.Protocol, Version: config.Version, PreviousRawTx: previous.Bytes(), PreviousSourceOutput: &tx.TransactionOutput{Satoshis: funding.PoolAmount, LockingScript: lock}, Sequence: sequence, SellerAmount: sellerAmount, ArbiterAmount: arbiterAmount, PoolAmount: funding.PoolAmount, Roles: roles, FeeRate: pool.FeeSatPerKB(config.FeeRate), PaymentProof: proof}))
 	}
-	lock, err := pool.BuildArbitratedPoolLock(roles)
-	if err != nil {
-		panic(err)
-	}
-	state.Inputs[0].SetSourceTxOutput(&tx.TransactionOutput{Satoshis: 19995, LockingScript: lock})
-	buyerSignature, err := pool.SignArbitratedPoolAsBuyer(state, 19995, roles, buyer)
-	if err != nil {
-		panic(err)
-	}
-	sellerSignature, err := pool.SignArbitratedPoolAsSeller(state, 19995, roles, seller)
-	if err != nil {
-		panic(err)
-	}
-	arbiterSignature, err := pool.SignArbitratedPoolAsArbiter(state, 19995, roles, arbiter)
-	if err != nil {
-		panic(err)
-	}
-	finalBuyerSeller, err := pool.MergeArbitratedPoolBuyerSellerSignatures(state, 19995, roles, buyerSignature, sellerSignature)
-	if err != nil {
-		panic(err)
-	}
-	finalBuyerArbiter, err := pool.MergeArbitratedPoolBuyerArbiterSignatures(state, 19995, roles, buyerSignature, arbiterSignature)
-	if err != nil {
-		panic(err)
-	}
-	finalSellerArbiter, err := pool.MergeArbitratedPoolSellerArbiterSignatures(state, 19995, roles, sellerSignature, arbiterSignature)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("LockHex %s\nStateHex %s\nBuyerSignatureHex %s\nSellerSignatureHex %s\nArbiterSignatureHex %s\nFinalBuyerSellerHex %s\nFinalBuyerArbiterHex %s\nFinalSellerArbiterHex %s\n", hex.EncodeToString(lock.Bytes()), hex.EncodeToString(state.Bytes()), hex.EncodeToString(buyerSignature), hex.EncodeToString(sellerSignature), hex.EncodeToString(arbiterSignature), hex.EncodeToString(finalBuyerSeller.Bytes()), hex.EncodeToString(finalBuyerArbiter.Bytes()), hex.EncodeToString(finalSellerArbiter.Bytes()))
+	negotiation := build(opening, config.NegotiationSequence, config.NegotiationSellerAmount, config.NegotiationArbiterAmount, nil)
+	paidArbiter := build(negotiation, config.PaidArbiterSequence, config.PaidArbiterSellerAmount, config.PaidArbiterAmount, nil)
+	proofState := build(paidArbiter, config.ProofSequence, config.ProofSellerAmount, config.ProofArbiterAmount, must(hex.DecodeString(config.PaymentProofHex)))
+	buyerSignature := must(pool.SignArbitratedPoolAsBuyer(paidArbiter, funding.PoolAmount, roles, buyer))
+	sellerSignature := must(pool.SignArbitratedPoolAsSeller(paidArbiter, funding.PoolAmount, roles, seller))
+	arbiterSignature := must(pool.SignArbitratedPoolAsArbiter(paidArbiter, funding.PoolAmount, roles, arbiter))
+	finalBuyerSeller := must(pool.MergeArbitratedPoolBuyerSellerSignatures(paidArbiter, funding.PoolAmount, roles, buyerSignature, sellerSignature))
+	finalBuyerArbiter := must(pool.MergeArbitratedPoolBuyerArbiterSignatures(paidArbiter, funding.PoolAmount, roles, buyerSignature, arbiterSignature))
+	finalSellerArbiter := must(pool.MergeArbitratedPoolSellerArbiterSignatures(paidArbiter, funding.PoolAmount, roles, sellerSignature, arbiterSignature))
+	fmt.Printf("LockHex %s\nFundingHex %s\nFundingTxID %s\nOpeningStateHex %s\nOpeningStateTxID %s\nNegotiationStateHex %s\nNegotiationStateTxID %s\nPaidArbiterStateHex %s\nPaidArbiterStateTxID %s\nProofStateHex %s\nProofStateTxID %s\nBuyerSignatureHex %s\nSellerSignatureHex %s\nArbiterSignatureHex %s\nFinalBuyerSellerHex %s\nFinalBuyerArbiterHex %s\nFinalSellerArbiterHex %s\n", hex.EncodeToString(lock.Bytes()), hex.EncodeToString(funding.Tx.Bytes()), funding.Tx.TxID().String(), hex.EncodeToString(opening.Bytes()), opening.TxID().String(), hex.EncodeToString(negotiation.Bytes()), negotiation.TxID().String(), hex.EncodeToString(paidArbiter.Bytes()), paidArbiter.TxID().String(), hex.EncodeToString(proofState.Bytes()), proofState.TxID().String(), hex.EncodeToString(buyerSignature), hex.EncodeToString(sellerSignature), hex.EncodeToString(arbiterSignature), hex.EncodeToString(finalBuyerSeller.Bytes()), hex.EncodeToString(finalBuyerArbiter.Bytes()), hex.EncodeToString(finalSellerArbiter.Bytes()))
 }

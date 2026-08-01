@@ -3,23 +3,24 @@ package arbitrated_pool
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/p2pkh"
-	libs "github.com/bsv8/MultisigPool/v3/pkg/libs"
+	libs "github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 type StateInput struct {
-	Protocol      string
-	Version       uint32
-	PreviousRawTx []byte
-	// PreviousSourceOutput 在标准 raw transaction 不包含源输出元数据时显式提供源输出。
+	Protocol             string
+	Version              uint32
+	PreviousRawTx        []byte
 	PreviousSourceOutput *tx.TransactionOutput
 	Sequence             uint32
 	LockTime             *uint32
-	BuyerAmount          uint64
+	BuyerAmount          *uint64
 	SellerAmount         uint64
+	ArbiterAmount        uint64
 	PoolAmount           uint64
 	Roles                ArbitratedPoolRoles
 	FeeRate              FeeSatPerKB
@@ -37,34 +38,52 @@ func clone(value *tx.Transaction) (*tx.Transaction, error) {
 	return copy, nil
 }
 
-func scripts(roles ArbitratedPoolRoles) (*script.Script, *script.Script, *script.Script, error) {
+func scripts(roles ArbitratedPoolRoles) (*script.Script, *script.Script, *script.Script, *script.Script, error) {
 	if err := validateRoles(roles); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	lock, err := BuildArbitratedPoolLock(roles)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	buyerAddress, err := libs.GetAddressFromPublicKey(roles.Buyer, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	sellerAddress, err := libs.GetAddressFromPublicKey(roles.Seller, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	arbiterAddress, err := libs.GetAddressFromPublicKey(roles.Arbiter, false)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	buyer, err := p2pkh.Lock(buyerAddress)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	seller, err := p2pkh.Lock(sellerAddress)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return lock, buyer, seller, nil
+	arbiter, err := p2pkh.Lock(arbiterAddress)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return lock, buyer, seller, arbiter, nil
 }
 
-// BuildArbitratedPoolState 固定输出 [Buyer, Seller]，Arbiter 没有资金输出。
+func checkedAllocation(seller, arbiter, pool uint64) (uint64, error) {
+	if seller > ^uint64(0)-arbiter {
+		return 0, fmt.Errorf("allocated amount overflow")
+	}
+	allocated := seller + arbiter
+	if allocated > pool {
+		return 0, fmt.Errorf("allocated amount exceeds pool amount")
+	}
+	return allocated, nil
+}
+
 func BuildArbitratedPoolState(input StateInput) (*tx.Transaction, error) {
 	if input.Protocol != Protocol || input.Version != Version {
 		return nil, fmt.Errorf("unsupported pool protocol: expected %s v%d", Protocol, Version)
@@ -76,14 +95,17 @@ func BuildArbitratedPoolState(input StateInput) (*tx.Transaction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode previous state: %w", err)
 	}
-	if len(state.Inputs) != 1 || (len(state.Outputs) != 2 && len(state.Outputs) != 3) || state.Inputs[0] == nil {
-		return nil, fmt.Errorf("arbitrated pool state must have one input and two value outputs")
+	if len(state.Inputs) != 1 || state.Inputs[0] == nil {
+		return nil, fmt.Errorf("arbitrated pool state must have exactly one input")
 	}
 	if input.Sequence <= state.Inputs[0].SequenceNumber {
 		return nil, fmt.Errorf("payment sequence must increase")
 	}
-	lock, buyer, seller, err := scripts(input.Roles)
+	lock, buyer, seller, arbiter, err := scripts(input.Roles)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateStateOutputs(state, input.Roles, buyer, seller, arbiter); err != nil {
 		return nil, err
 	}
 	source := state.Inputs[0].SourceTxOutput()
@@ -98,22 +120,20 @@ func BuildArbitratedPoolState(input StateInput) (*tx.Transaction, error) {
 	if source == nil {
 		return nil, fmt.Errorf("previous state source output is required")
 	}
-	if source == nil || source.Satoshis != input.PoolAmount || !bytes.Equal(source.LockingScript.Bytes(), lock.Bytes()) {
+	if source.Satoshis != input.PoolAmount || !bytes.Equal(source.LockingScript.Bytes(), lock.Bytes()) {
 		return nil, fmt.Errorf("previous state source output does not match configured pool")
 	}
-	if state.Inputs[0].SourceTxOutput() == nil {
-		state.Inputs[0].SetSourceTxOutput(source)
+	state.Inputs[0].SetSourceTxOutput(source)
+	allocated, err := checkedAllocation(input.SellerAmount, input.ArbiterAmount, input.PoolAmount)
+	if err != nil {
+		return nil, err
 	}
-	if !bytes.Equal(state.Outputs[0].LockingScript.Bytes(), buyer.Bytes()) || !bytes.Equal(state.Outputs[1].LockingScript.Bytes(), seller.Bytes()) {
-		return nil, fmt.Errorf("previous state outputs do not match buyer and seller roles")
-	}
-	if input.SellerAmount > input.PoolAmount {
-		return nil, fmt.Errorf("seller amount exceeds pool amount")
-	}
-	state.Outputs[0].Satoshis = input.PoolAmount - input.SellerAmount
-	state.Outputs[1].Satoshis = input.SellerAmount
 	state.Outputs[0].LockingScript = buyer
 	state.Outputs[1].LockingScript = seller
+	state.Outputs[2].LockingScript = arbiter
+	state.Outputs[0].Satoshis = input.PoolAmount - allocated
+	state.Outputs[1].Satoshis = input.SellerAmount
+	state.Outputs[2].Satoshis = input.ArbiterAmount
 	state.Inputs[0].SequenceNumber = input.Sequence
 	if input.LockTime != nil {
 		state.LockTime = *input.LockTime
@@ -123,8 +143,8 @@ func BuildArbitratedPoolState(input StateInput) (*tx.Transaction, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(state.Outputs) == 3 {
-			state.Outputs[2] = &tx.TransactionOutput{Satoshis: 0, LockingScript: proof}
+		if len(state.Outputs) == 4 {
+			state.Outputs[3] = &tx.TransactionOutput{Satoshis: 0, LockingScript: proof}
 		} else {
 			state.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: proof})
 		}
@@ -142,7 +162,7 @@ func BuildArbitratedPoolState(input StateInput) (*tx.Transaction, error) {
 		return nil, fmt.Errorf("buyer balance is insufficient for fee")
 	}
 	state.Outputs[0].Satoshis -= fee
-	if input.BuyerAmount != 0 && input.BuyerAmount != state.Outputs[0].Satoshis {
+	if input.BuyerAmount != nil && *input.BuyerAmount != state.Outputs[0].Satoshis {
 		return nil, fmt.Errorf("buyer amount does not match canonical fee")
 	}
 	state.Inputs[0].UnlockingScript = script.NewFromBytes(nil)
@@ -153,34 +173,22 @@ func BuildArbitratedPoolOpeningState(fundingTxID []byte, poolOutputIndex uint32,
 	if len(fundingTxID) != 32 || poolAmount == 0 {
 		return nil, fmt.Errorf("funding outpoint and pool amount are required")
 	}
-	lock, buyer, seller, err := scripts(roles)
+	lock, buyer, seller, arbiter, err := scripts(roles)
 	if err != nil {
 		return nil, err
 	}
-	state := tx.NewTransaction()
 	id, err := chainhash.NewHash(fundingTxID)
 	if err != nil {
 		return nil, err
 	}
-	state.AddInputWithOutput(&tx.TransactionInput{SourceTXID: id, SourceTxOutIndex: poolOutputIndex, SequenceNumber: 2, UnlockingScript: script.NewFromBytes(nil)}, &tx.TransactionOutput{Satoshis: poolAmount, LockingScript: lock})
-	state.AddOutput(&tx.TransactionOutput{Satoshis: poolAmount, LockingScript: buyer})
-	state.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: seller})
-	state.LockTime = lockTime
-	fake, err := libs.FakeSign(2)
-	if err != nil {
-		return nil, err
-	}
-	state.Inputs[0].UnlockingScript = fake
-	fee, err := feeSat(state.Size(), rate)
-	if err != nil {
-		return nil, err
-	}
-	if fee > poolAmount {
-		return nil, fmt.Errorf("buyer balance is insufficient for fee")
-	}
-	state.Outputs[0].Satoshis -= fee
-	state.Inputs[0].UnlockingScript = script.NewFromBytes(nil)
-	return state, nil
+	previous := tx.NewTransaction()
+	source := &tx.TransactionOutput{Satoshis: poolAmount, LockingScript: lock}
+	previous.AddInputWithOutput(&tx.TransactionInput{SourceTXID: id, SourceTxOutIndex: poolOutputIndex, SequenceNumber: 1, UnlockingScript: script.NewFromBytes(nil)}, source)
+	previous.AddOutput(&tx.TransactionOutput{Satoshis: poolAmount, LockingScript: buyer})
+	previous.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: seller})
+	previous.AddOutput(&tx.TransactionOutput{Satoshis: 0, LockingScript: arbiter})
+	previous.LockTime = lockTime
+	return BuildArbitratedPoolState(StateInput{Protocol: Protocol, Version: Version, PreviousRawTx: previous.Bytes(), PreviousSourceOutput: source, Sequence: 2, SellerAmount: 0, ArbiterAmount: 0, PoolAmount: poolAmount, Roles: roles, FeeRate: rate})
 }
 
 func BuildArbitratedPoolFinalState(input StateInput) (*tx.Transaction, error) {

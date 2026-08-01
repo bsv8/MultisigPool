@@ -1,4 +1,4 @@
-export { buildArbitratedPoolLock, validateArbitratedPoolRoles } from './script';
+export { buildArbitratedPoolLock, buildArbitratedPoolOutputScripts, validateArbitratedPoolRoles, validateArbitratedPoolStateOutputs } from './script';
 export { Protocol, Version, validatePoolProtocol } from '../types';
 export * from './funding';
 export * from './state';

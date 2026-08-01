@@ -6,7 +6,7 @@ import (
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
-	"github.com/bsv8/MultisigPool/v3/pkg/libs"
+	"github.com/bsv8/MultisigPool/v4/pkg/libs"
 )
 
 func TestTwoPartyPoolUsesBuyerSellerOrderAndPureSigning(t *testing.T) {

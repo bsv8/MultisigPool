@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 NPM_REGISTRY='https://registry.npmjs.org'
 CRATES_REGISTRY='https://crates.io/api/v1/crates'
 GO_PROXY='https://proxy.golang.org'
-GO_MODULE_PATH='github.com/bsv8/MultisigPool/v3'
-GO_PROXY_MODULE_PATH='github.com/bsv8/!multisig!pool/v3'
+GO_MODULE_PATH='github.com/bsv8/MultisigPool/v4'
+GO_PROXY_MODULE_PATH='github.com/bsv8/!multisig!pool/v4'
 
 RESUME_POINT='normal'
 if [[ "$#" -eq 0 ]]; then

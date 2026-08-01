@@ -138,15 +138,20 @@ fn test_build_sign_script(public_keys: &[PublicKey], _private_keys: &[PrivateKey
 }
 
 fn create_dummy_transaction() -> Transaction {
-    let inputs = vec![TransactionInput::new("a".repeat(64), 0, 0xffffffff)];
-
-    let outputs = vec![TransactionOutput::new(
+    let output = TransactionOutput::new(
         1000,
         vec![
             0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0xac,
         ],
-    )];
+    );
+    let inputs = vec![TransactionInput {
+        source_txid: "a".repeat(64),
+        source_output_index: 0,
+        unlocking_script: Vec::new(),
+        sequence: 0xffffffff,
+        source_output: Some(output.clone()),
+    }];
 
-    Transaction::new(1, inputs, outputs, 0)
+    Transaction::new(1, inputs, vec![output], 0)
 }

@@ -1,4 +1,4 @@
-// MultisigPool TypeScript SDK v3。
+// MultisigPool TypeScript SDK v4。
 export { Protocol, ProtocolVersion, Version, ReleaseVersion } from './version';
 export * from './types';
 export * from './crypto/go_rfc6979';

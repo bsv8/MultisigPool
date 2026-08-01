@@ -1,6 +1,6 @@
 # Online TwoPartyPool
 
-该示例连接 WhatsOnChain BSV testnet，读取 Buyer 地址的 UTXO 和当前区块高度，然后构建 Buyer/Seller v3 的 2-of-2 funding、opening state、签名和最终交易。
+该示例连接 WhatsOnChain BSV testnet，读取 Buyer 地址的 UTXO 和当前区块高度，然后构建 Buyer/Seller v4 的 2-of-2 funding、opening state、签名和最终交易。
 
 需要设置：
 
