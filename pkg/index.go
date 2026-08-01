@@ -8,8 +8,8 @@ import (
 	triple "github.com/bsv8/MultisigPool/pkg/triple_endpoint"
 )
 
-// Version of the MultisigPool library
-const Version = "2.0.0"
+// Version 是 MultisigPool 的统一发布版本。
+const Version = "2.1.0"
 
 // Re-export multisig types and functions
 type MultiSig = libs.MultiSig

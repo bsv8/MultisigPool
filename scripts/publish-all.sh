@@ -56,9 +56,18 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# 更新 package.json 版本
+# 更新 NPM 版本
 echo "📝 更新 package.json 版本..."
 npm version $NPM_VERSION --no-git-tag-version
+
+# 更新 Go 发布版本
+GO_VERSION_FILE="pkg/index.go"
+GO_VERSION_DECLARATIONS=$(grep -Ec '^const Version = "[0-9]+\.[0-9]+\.[0-9]+"$' "$GO_VERSION_FILE")
+if [ "$GO_VERSION_DECLARATIONS" -ne 1 ]; then
+    echo "ERROR: expected exactly one release version declaration in $GO_VERSION_FILE" >&2
+    exit 1
+fi
+sed -i -E "s/^const Version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/const Version = \"$VERSION\"/" "$GO_VERSION_FILE"
 
 # 构建项目
 echo "🔨 构建项目..."
@@ -67,7 +76,7 @@ npm run build
 
 # 提交版本更改
 echo "💾 提交版本更改..."
-git add package.json package-lock.json
+git add package.json package-lock.json "$GO_VERSION_FILE"
 git commit -m "chore: bump version to $VERSION"
 
 # 创建并推送 git tag

@@ -1,6 +1,6 @@
 {
   "name": "keymaster-multisig-pool",
-  "version": "1.5.0",
+  "version": "2.1.0",
   "description": "A multisig pool implementation with TypeScript and Go support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
