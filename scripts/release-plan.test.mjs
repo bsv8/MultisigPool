@@ -11,6 +11,7 @@ import {
   classifyRegistryStatus,
   deriveReleaseTags,
   parseReleaseArguments,
+  validateCratesRegistryMetadata,
   validateNpmRegistryMetadata,
   validateReleasePreflight,
   validateRustVcsInfo,
@@ -158,6 +159,30 @@ test('npm registry 必须提供当前 commit 的 gitHead 并匹配产物 integri
     ...common,
     metadata: { name: common.expectedName, version: common.expectedVersion, gitHead: common.expectedCommit, 'dist.integrity': 'sha512-other-artifact' },
   }), /integrity does not match/);
+});
+
+test('crates.io registry 必须使用当前版本响应结构并提供合法 checksum', () => {
+  const expectedName = 'keymaster-multisig-rust';
+  const expectedVersion = '3.0.0';
+  const checksum = 'a'.repeat(64);
+  const common = { expectedName, expectedVersion };
+
+  assert.equal(validateCratesRegistryMetadata({
+    ...common,
+    metadata: { version: { crate: expectedName, num: expectedVersion, checksum } },
+  }), checksum);
+  assert.throws(() => validateCratesRegistryMetadata({
+    ...common,
+    metadata: { crate: { id: expectedName }, version: { num: expectedVersion, checksum } },
+  }), /unexpected package: undefined@3\.0\.0/);
+  assert.throws(() => validateCratesRegistryMetadata({
+    ...common,
+    metadata: { version: { crate: 'other-crate', num: expectedVersion, checksum } },
+  }), /unexpected package: other-crate@3\.0\.0/);
+  assert.throws(() => validateCratesRegistryMetadata({
+    ...common,
+    metadata: { version: { crate: expectedName, num: expectedVersion, checksum: 'invalid' } },
+  }), /valid crate checksum/);
 });
 
 test('从目录发布时 npm 会把当前 Git commit 放入 registry metadata', async () => {

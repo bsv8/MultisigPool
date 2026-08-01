@@ -323,16 +323,11 @@ verify_crates_registry() {
   fi
   expected_checksum="$(node --input-type=module - "$body_path" "$RUST_PACKAGE_NAME" "$RUST_VERSION" <<'NODE'
 import fs from 'node:fs';
+import { validateCratesRegistryMetadata } from './scripts/release-plan.mjs';
 
 const [bodyPath, expectedName, expectedVersion] = process.argv.slice(2);
 const value = JSON.parse(fs.readFileSync(bodyPath, 'utf8'));
-if (value.crate?.id !== expectedName || value.version?.num !== expectedVersion) {
-  throw new Error(`crates.io returned an unexpected package: ${value.crate?.id}@${value.version?.num}`);
-}
-if (typeof value.version?.checksum !== 'string' || !/^[0-9a-f]{64}$/.test(value.version.checksum)) {
-  throw new Error('crates.io response does not contain a valid crate checksum');
-}
-process.stdout.write(value.version.checksum);
+process.stdout.write(validateCratesRegistryMetadata({ metadata: value, expectedName, expectedVersion }));
 NODE
   )"
   archive_path="$(mktemp)"

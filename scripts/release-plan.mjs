@@ -59,6 +59,19 @@ export function validateNpmRegistryMetadata({
   }
 }
 
+export function validateCratesRegistryMetadata({ metadata, expectedName, expectedVersion }) {
+  const registryName = metadata?.version?.crate;
+  const registryVersion = metadata?.version?.num;
+  if (registryName !== expectedName || registryVersion !== expectedVersion) {
+    throw new Error(`crates.io returned an unexpected package: ${registryName}@${registryVersion}`);
+  }
+  const checksum = metadata.version.checksum;
+  if (typeof checksum !== 'string' || !/^[0-9a-f]{64}$/.test(checksum)) {
+    throw new Error('crates.io response does not contain a valid crate checksum');
+  }
+  return checksum;
+}
+
 export function validateRustVcsInfo({ value, expectedCommit }) {
   if (value?.git?.sha1 !== expectedCommit) {
     throw new Error(`Rust crate git commit ${value?.git?.sha1}, expected ${expectedCommit}`);
