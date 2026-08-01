@@ -1,69 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# NPM 发布脚本
-set -e
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "📦 发布 NPM 包..."
+echo "Publishing the npm package..."
 
-# 检查是否有未提交的更改
-if ! git diff --quiet; then
-    echo "❌ 有未提交的更改，请先提交代码"
+if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+    echo "ERROR: working tree contains tracked, staged, or untracked changes" >&2
     exit 1
 fi
 
 # 检查是否在正确的分支
 CURRENT_BRANCH=$(git branch --show-current)
 if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
-    echo "⚠️  当前不在主分支，当前分支: $CURRENT_BRANCH"
-    read -p "是否继续发布? (y/N): " -n 1 -r
+    echo "ERROR: current branch is not main or master: $CURRENT_BRANCH" >&2
+    read -r -p "Continue publishing? (y/N): " -n 1 REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
 fi
 
-# 运行测试
-echo "🧪 运行测试..."
-npm test
-
-# 构建项目
-echo "🔨 构建项目..."
-npm run build
-
-# 检查构建输出
-if [ ! -d "dist" ]; then
-    echo "❌ 构建失败，dist 目录不存在"
-    exit 1
-fi
+bash scripts/run_all_tests.sh
 
 # 获取当前版本
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "当前版本: $CURRENT_VERSION"
 
 # 询问版本更新类型
-echo "选择版本更新类型:"
-echo "1) patch (修复版本)"
-echo "2) minor (功能版本)"
-echo "3) major (重大版本)"
-echo "4) 自定义版本"
-read -p "请选择 (1-4): " VERSION_TYPE
+echo "Select the version update type:"
+echo "1) patch"
+echo "2) minor"
+echo "3) major"
+echo "4) custom"
+read -r -p "Select (1-4): " VERSION_TYPE
 
 case $VERSION_TYPE in
     1)
-        npm version patch
+        npm version patch --no-git-tag-version
         ;;
     2)
-        npm version minor
+        npm version minor --no-git-tag-version
         ;;
     3)
-        npm version major
+        npm version major --no-git-tag-version
         ;;
     4)
-        read -p "输入新版本号: " NEW_VERSION
-        npm version $NEW_VERSION
+        read -r -p "Enter the new version: " NEW_VERSION
+        npm version "$NEW_VERSION" --no-git-tag-version
         ;;
     *)
-        echo "❌ 无效选择"
+        echo "ERROR: invalid version selection" >&2
         exit 1
         ;;
 esac
@@ -71,6 +59,9 @@ esac
 # 获取新版本
 NEW_VERSION=$(node -p "require('./package.json').version")
 echo "新版本: $NEW_VERSION"
+
+echo "Running the release gate after selecting the version..."
+bash scripts/run_all_tests.sh
 
 # 推送 git 标签
 echo "📤 推送 git 标签..."

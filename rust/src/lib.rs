@@ -1,34 +1,37 @@
 mod error;
-mod types;
 mod multisig;
+mod types;
 
 pub use error::{MultisigError, Result};
-pub use types::*;
 pub use multisig::Multisig;
+pub use types::*;
 
-use wasm_bindgen::prelude::*;
 use serde_wasm_bindgen as swbg;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn create_multisig(
     private_keys: JsValue,
     public_keys: JsValue,
     m: usize,
-) -> Result<MultisigWasm, JsValue> {
+) -> std::result::Result<MultisigWasm, JsValue> {
     let pub_keys: Vec<PublicKey> = swbg::from_value(public_keys)?;
     let priv_keys: Option<Vec<PrivateKey>> = swbg::from_value(private_keys).ok();
 
-    let multisig = Multisig::new(priv_keys, pub_keys, m)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let multisig =
+        Multisig::new(priv_keys, pub_keys, m).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     Ok(MultisigWasm { multisig })
 }
 
 #[wasm_bindgen]
-pub fn create_locking_script(public_keys: JsValue, m: usize) -> Result<JsValue, JsValue> {
+pub fn create_locking_script(
+    public_keys: JsValue,
+    m: usize,
+) -> std::result::Result<JsValue, JsValue> {
     let pub_keys: Vec<PublicKey> = swbg::from_value(public_keys)?;
-    
-    if m <= 0 || m > pub_keys.len() {
+
+    if m == 0 || m > pub_keys.len() {
         return Err(JsValue::from_str("Invalid m value"));
     }
     if pub_keys.is_empty() || pub_keys.len() > 20 {
@@ -65,28 +68,43 @@ impl MultisigWasm {
         private_keys: JsValue,
         public_keys: JsValue,
         m: usize,
-    ) -> Result<MultisigWasm, JsValue> {
+    ) -> std::result::Result<MultisigWasm, JsValue> {
         create_multisig(private_keys, public_keys, m)
     }
 
-    pub fn lock(&self) -> Result<JsValue, JsValue> {
-        let script = self.multisig.lock()
+    pub fn lock(&self) -> std::result::Result<JsValue, JsValue> {
+        let script = self
+            .multisig
+            .lock()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(swbg::to_value(&script)?)
     }
 
-    pub fn sign(&self, transaction: JsValue, input_index: usize) -> Result<JsValue, JsValue> {
+    pub fn sign(
+        &self,
+        transaction: JsValue,
+        input_index: usize,
+    ) -> std::result::Result<JsValue, JsValue> {
         let tx: Transaction = swbg::from_value(transaction)?;
-        let signatures = self.multisig.sign(&tx, input_index)
+        let signatures = self
+            .multisig
+            .sign(&tx, input_index)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(swbg::to_value(&signatures)?)
     }
 
-    pub fn sign_one(&self, transaction: JsValue, input_index: usize, private_key: JsValue) -> Result<JsValue, JsValue> {
+    pub fn sign_one(
+        &self,
+        transaction: JsValue,
+        input_index: usize,
+        private_key: JsValue,
+    ) -> std::result::Result<JsValue, JsValue> {
         let tx: Transaction = swbg::from_value(transaction)?;
         let priv_key: PrivateKey = swbg::from_value(private_key)?;
-        
-        let signature = self.multisig.sign_one(&tx, input_index, &priv_key)
+
+        let signature = self
+            .multisig
+            .sign_one(&tx, input_index, &priv_key)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(swbg::to_value(&signature)?)
     }
@@ -95,15 +113,19 @@ impl MultisigWasm {
         self.multisig.estimate_length()
     }
 
-    pub fn create_fake_sign(&self) -> Result<JsValue, JsValue> {
-        let script = self.multisig.create_fake_sign()
+    pub fn create_fake_sign(&self) -> std::result::Result<JsValue, JsValue> {
+        let script = self
+            .multisig
+            .create_fake_sign()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(swbg::to_value(&script)?)
     }
 
-    pub fn build_sign_script(&self, signatures: JsValue) -> Result<JsValue, JsValue> {
+    pub fn build_sign_script(&self, signatures: JsValue) -> std::result::Result<JsValue, JsValue> {
         let sigs: Vec<Vec<u8>> = swbg::from_value(signatures)?;
-        let script = self.multisig.build_sign_script(&sigs)
+        let script = self
+            .multisig
+            .build_sign_script(&sigs)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(swbg::to_value(&script)?)
     }

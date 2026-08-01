@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PublicKey {
+    #[wasm_bindgen(skip)]
     pub key: Vec<u8>,
 }
 
@@ -22,6 +23,7 @@ impl PublicKey {
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PrivateKey {
+    #[wasm_bindgen(skip)]
     pub key: Vec<u8>,
 }
 
@@ -40,6 +42,7 @@ impl PrivateKey {
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TransactionInput {
+    #[wasm_bindgen(skip)]
     pub source_txid: String,
     pub source_output_index: u32,
     pub sequence: u32,
@@ -61,6 +64,7 @@ impl TransactionInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TransactionOutput {
     pub satoshis: u64,
+    #[wasm_bindgen(skip)]
     pub locking_script: Vec<u8>,
 }
 
@@ -79,7 +83,9 @@ impl TransactionOutput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
     pub version: u32,
+    #[wasm_bindgen(skip)]
     pub inputs: Vec<TransactionInput>,
+    #[wasm_bindgen(skip)]
     pub outputs: Vec<TransactionOutput>,
     pub lock_time: u32,
 }

@@ -1,118 +1,31 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "=== Rust vs Golang Cross-Validation ==="
-echo ""
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo is required for Rust cross-validation" >&2
+  exit 1
+fi
 
-# Get current directory
-DIR=$(cd "$(dirname "$0")" && pwd)
-echo "Working directory: $DIR"
-echo ""
+rust_output="$(cargo run --manifest-path examples/rust_go_comparison/Cargo.toml --quiet)"
+go_output="$(go run examples/rust_go_comparison/go_runner/main.go)"
 
-# Change to script directory
-cd "$DIR"
-
-# Clean up any previous builds
-rm -f rust_runner 2>/dev/null || true
-
-# Compile Rust runner
-echo "Step 1: Compiling Rust runner..."
-cargo build --release
-if [ $? -eq 0 ]; then
-    echo "✅ Rust compilation successful"
-else
-    echo "❌ Rust compilation failed"
+for step in 1 2 3 4 5; do
+  rust_value="$(printf '%s\n' "$rust_output" | awk -v step="$step" '$1 == "Step" step "Hex" {print $2}')"
+  go_value="$(printf '%s\n' "$go_output" | awk -v step="$step" '$1 == "Step" step "Hex" {print $2}')"
+  if [[ -z "$rust_value" || -z "$go_value" ]]; then
+    echo "missing Step${step}Hex output" >&2
     exit 1
-fi
-echo ""
+  fi
+  if [[ "$rust_value" != "$go_value" ]]; then
+    echo "Rust and Go mismatch at Step${step}Hex" >&2
+    echo "Rust: $rust_value" >&2
+    echo "Go:   $go_value" >&2
+    exit 1
+  fi
+  echo "MATCH Step${step}Hex"
+done
 
-# Run Rust implementation
-echo "Step 2: Running Rust implementation..."
-RUST_OUTPUT=$(./target/release/rust-go-comparison)
-echo "$RUST_OUTPUT"
-echo ""
-
-# Extract Rust results
-RUST_STEP1=$(echo "$RUST_OUTPUT" | grep "Step1Hex" | awk '{print $2}')
-RUST_STEP2=$(echo "$RUST_OUTPUT" | grep "Step2Hex" | awk '{print $2}')
-RUST_STEP3=$(echo "$RUST_OUTPUT" | grep "Step3Hex" | awk '{print $2}')
-RUST_STEP4=$(echo "$RUST_OUTPUT" | grep "Step4Hex" | awk '{print $2}')
-RUST_STEP5=$(echo "$RUST_OUTPUT" | grep "Step5Hex" | awk '{print $2}')
-
-# Run Golang implementation
-echo "Step 3: Running Golang implementation..."
-GO_OUTPUT=$(go run main.go)
-echo "$GO_OUTPUT"
-echo ""
-
-# Extract Golang results
-GO_STEP1=$(echo "$GO_OUTPUT" | grep "Step1Hex" | awk '{print $2}')
-GO_STEP2=$(echo "$GO_OUTPUT" | grep "Step2Hex" | awk '{print $2}')
-GO_STEP3=$(echo "$GO_OUTPUT" | grep "Step3Hex" | awk '{print $2}')
-GO_STEP4=$(echo "$GO_OUTPUT" | grep "Step4Hex" | awk '{print $2}')
-GO_STEP5=$(echo "$GO_OUTPUT" | grep "Step5Hex" | awk '{print $2}')
-
-# Compare results
-echo "=== Comparison Results ==="
-PASS=true
-
-echo "Step 1: Base Transaction"
-if [ "$RUST_STEP1" = "$GO_STEP1" ]; then
-    echo "✅ MATCH"
-else
-    echo "❌ MISMATCH"
-    echo "   Rust: $RUST_STEP1"
-    echo "   Go:   $GO_STEP1"
-    PASS=false
-fi
-
-echo "Step 2: Client Sign"
-if [ "$RUST_STEP2" = "$GO_STEP2" ]; then
-    echo "✅ MATCH"
-else
-    echo "❌ MISMATCH"
-    echo "   Rust: $RUST_STEP2"
-    echo "   Go:   $GO_STEP2"
-    PASS=false
-fi
-
-echo "Step 3: Server Sign"
-if [ "$RUST_STEP3" = "$GO_STEP3" ]; then
-    echo "✅ MATCH"
-else
-    echo "❌ MISMATCH"
-    echo "   Rust: $RUST_STEP3"
-    echo "   Go:   $GO_STEP3"
-    PASS=false
-fi
-
-echo "Step 4: Client Update Sign"
-if [ "$RUST_STEP4" = "$GO_STEP4" ]; then
-    echo "✅ MATCH"
-else
-    echo "❌ MISMATCH"
-    echo "   Rust: $RUST_STEP4"
-    echo "   Go:   $GO_STEP4"
-    PASS=false
-fi
-
-echo "Step 5: Server Update Sign"
-if [ "$RUST_STEP5" = "$GO_STEP5" ]; then
-    echo "✅ MATCH"
-else
-    echo "❌ MISMATCH"
-    echo "   Rust: $RUST_STEP5"
-    echo "   Go:   $GO_STEP5"
-    PASS=false
-fi
-
-echo ""
-if [ "$PASS" = true ]; then
-    echo "🎉 PASS: Rust and Golang implementations produce identical results!"
-else
-    echo "❌ FAIL: Rust and Golang implementations differ"
-fi
-
-echo ""
-echo "=== Cross-Validation Complete ==="
+echo "PASS: Rust and Go bytes are identical"

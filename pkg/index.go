@@ -1,73 +1,139 @@
-// Package pkg provides multisig functionality for Bitcoin SV transactions
+// Package pkg provides the v3 multisig-pool protocol for Bitcoin SV transactions.
 package pkg
 
-// Re-export commonly used types and functions from subpackages
 import (
-	dual "github.com/bsv8/MultisigPool/pkg/dual_endpoint"
-	"github.com/bsv8/MultisigPool/pkg/libs"
-	triple "github.com/bsv8/MultisigPool/pkg/triple_endpoint"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/script"
+	tx "github.com/bsv-blockchain/go-sdk/transaction"
+	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
+	arbitrated "github.com/bsv8/MultisigPool/v3/pkg/arbitrated_pool"
+	"github.com/bsv8/MultisigPool/v3/pkg/libs"
+	twoParty "github.com/bsv8/MultisigPool/v3/pkg/two_party_pool"
 )
 
-// Version 是 MultisigPool 的统一发布版本。
-const Version = "2.1.0"
+// ProtocolVersion 是交易数据中使用的协议版本。
+const ProtocolVersion uint32 = 3
 
-// Re-export multisig types and functions
+// ReleaseVersion 是 Go module 与 npm 包对应的发布版本，不参与交易协议校验。
+const ReleaseVersion = "3.0.0"
+
+// Version 保留为公共协议版本入口，类型与各池 StateInput.Version 一致。
+const Version uint32 = ProtocolVersion
+
+const Protocol = "bitfs.pool.v3"
+
 type MultiSig = libs.MultiSig
 type UTXO = libs.UTXO
-type FeeSatPerKB = triple.FeeSatPerKB
-type TriplePoolStateInput = triple.TriplePoolStateInput
-type TriplePoolOpeningInput = triple.TriplePoolOpeningInput
+type TwoPartyPoolRoles = twoParty.TwoPartyPoolRoles
+type ArbitratedPoolRoles = arbitrated.ArbitratedPoolRoles
+type TwoPartyPoolStateInput = twoParty.StateInput
+type ArbitratedPoolStateInput = arbitrated.StateInput
+type TwoPartyPoolFundingResult = twoParty.FundingTxResult
+type ArbitratedPoolFundingResult = arbitrated.FundingTxResult
+type FeeSatPerKB = arbitrated.FeeSatPerKB
 
-var (
-	// Multisig script creation
-	Lock   = libs.Lock
-	Unlock = libs.Unlock
+func Lock(pubKeys []*ec.PublicKey, m int) (*script.Script, error) {
+	return libs.Lock(pubKeys, m)
+}
 
-	// Utility functions
-	GetAddressFromPublicKey = libs.GetAddressFromPublicKey
-	GetAddressFromPubKey    = libs.GetAddressFromPubKey
+func Unlock(privKeys []*ec.PrivateKey, pubKeys []*ec.PublicKey, m int, sigHashFlag *sighash.Flag) (*MultiSig, error) {
+	return libs.Unlock(privKeys, pubKeys, m, sigHashFlag)
+}
 
-	// Dual endpoint functions
-	DualPoolSpentScript        = dual.DualPoolSpentScript
-	MergeDualPoolSigForSpendTx = dual.MergeDualPoolSigForSpendTx
-	// Dual endpoint verify helpers
-	ServerVerifyClientSpendSig  = dual.ServerVerifyClientSpendSig
-	ClientVerifyServerSpendSig  = dual.ClientVerifyServerSpendSig
-	ServerVerifyClientUpdateSig = dual.ServerVerifyClientUpdateSig
-	ClientVerifyServerUpdateSig = dual.ClientVerifyServerUpdateSig
+func GetAddressFromPublicKey(pubKey *ec.PublicKey, isMain bool) (*script.Address, error) {
+	return libs.GetAddressFromPublicKey(pubKey, isMain)
+}
 
-	// Triple endpoint functions
-	TripleFeePoolSpentScript        = triple.TripleFeePoolSpentScript
-	MergeTriplePoolServerA          = triple.MergeTriplePoolServerA
-	MergeTriplePoolServerB          = triple.MergeTriplePoolServerB
-	MergeTriplePoolServerAWithRoles = triple.MergeTriplePoolServerAWithRoles
-	MergeTriplePoolServerBWithRoles = triple.MergeTriplePoolServerBWithRoles
-	BuildTriplePoolLock             = triple.BuildTriplePoolLock
-	BuildTriplePoolState            = triple.BuildTriplePoolState
-	BuildTriplePoolInitialState     = triple.BuildTriplePoolInitialState
-	BuildTriplePoolFinalState       = triple.BuildTriplePoolFinalState
-	BuildTriplePoolOpeningState     = triple.BuildTriplePoolOpeningState
-	SignTriplePoolAsServer          = triple.SignTriplePoolAsServer
-	SignTriplePoolAsA               = triple.SignTriplePoolAsA
-	SignTriplePoolAsB               = triple.SignTriplePoolAsB
-	AttachTriplePoolASignature      = triple.AttachTriplePoolASignature
-	AttachTriplePoolServerSignature = triple.AttachTriplePoolServerSignature
-	VerifyTriplePoolServerSignature = triple.VerifyTriplePoolServerSignature
-	VerifyTriplePoolASignature      = triple.VerifyTriplePoolASignature
-	VerifyTriplePoolBSignature      = triple.VerifyTriplePoolBSignature
-	VerifyTriplePoolState           = triple.VerifyTriplePoolState
-	VerifyTriplePoolStateWithFee    = triple.VerifyTriplePoolStateWithFee
-	TriplePoolFeeSat                = triple.TriplePoolFeeSat
-	// Triple endpoint verify helpers
-	ServerVerifyClientASig               = triple.ServerVerifyClientASig
-	ServerVerifyClientBSig               = triple.ServerVerifyClientBSig
-	ClientVerifyServerSig                = triple.ClientVerifyServerSig
-	ServerTripleFeePoolSpendTXUpdateSign = triple.ServerTripleFeePoolSpendTXUpdateSign
-)
+var ErrInvalidPublicKeys = libs.ErrInvalidPublicKeys
 
-// Common errors
-var (
-	ErrInvalidPublicKeys = libs.ErrInvalidPublicKeys
-	ErrNoPrivateKeys     = libs.ErrNoPrivateKeys
-	ErrInvalidM          = libs.ErrInvalidM
-)
+func BuildTwoPartyPoolLock(roles TwoPartyPoolRoles) (*script.Script, error) {
+	return twoParty.BuildTwoPartyPoolLock(roles)
+}
+
+func BuildTwoPartyPoolFundingTx(utxos []UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles TwoPartyPoolRoles, isMain bool, feeRate float64) (*TwoPartyPoolFundingResult, error) {
+	return twoParty.BuildTwoPartyPoolFundingTx(utxos, poolAmount, buyerPrivateKey, roles, isMain, feeRate)
+}
+
+func BuildTwoPartyPoolState(input TwoPartyPoolStateInput) (*tx.Transaction, error) {
+	return twoParty.BuildTwoPartyPoolState(input)
+}
+
+func BuildTwoPartyPoolOpeningState(fundingTxID []byte, poolOutputIndex uint32, poolAmount uint64, roles TwoPartyPoolRoles, lockTime uint32, feeRate FeeSatPerKB) (*tx.Transaction, error) {
+	return twoParty.BuildTwoPartyPoolOpeningState(fundingTxID, poolOutputIndex, poolAmount, roles, lockTime, twoParty.FeeSatPerKB(feeRate))
+}
+
+func SignTwoPartyPoolAsBuyer(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, key *ec.PrivateKey) ([]byte, error) {
+	return twoParty.SignTwoPartyPoolAsBuyer(state, poolAmount, roles, key)
+}
+
+func SignTwoPartyPoolAsSeller(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, key *ec.PrivateKey) ([]byte, error) {
+	return twoParty.SignTwoPartyPoolAsSeller(state, poolAmount, roles, key)
+}
+
+func VerifyTwoPartyPoolBuyerSignature(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, signature []byte) (bool, error) {
+	return twoParty.VerifyTwoPartyPoolBuyerSignature(state, poolAmount, roles, signature)
+}
+
+func VerifyTwoPartyPoolSellerSignature(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, signature []byte) (bool, error) {
+	return twoParty.VerifyTwoPartyPoolSellerSignature(state, poolAmount, roles, signature)
+}
+
+func MergeTwoPartyPoolBuyerSellerSignatures(state *tx.Transaction, poolAmount uint64, roles TwoPartyPoolRoles, buyerSignature, sellerSignature []byte) (*tx.Transaction, error) {
+	return twoParty.MergeTwoPartyPoolBuyerSellerSignatures(state, poolAmount, roles, buyerSignature, sellerSignature)
+}
+
+func BuildArbitratedPoolLock(roles ArbitratedPoolRoles) (*script.Script, error) {
+	return arbitrated.BuildArbitratedPoolLock(roles)
+}
+
+func BuildArbitratedPoolFundingTx(utxos []UTXO, poolAmount uint64, buyerPrivateKey *ec.PrivateKey, roles ArbitratedPoolRoles, isMain bool, feeRate float64) (*ArbitratedPoolFundingResult, error) {
+	return arbitrated.BuildArbitratedPoolFundingTx(utxos, poolAmount, buyerPrivateKey, roles, isMain, feeRate)
+}
+
+func BuildArbitratedPoolOpeningState(fundingTxID []byte, poolOutputIndex uint32, poolAmount uint64, roles ArbitratedPoolRoles, lockTime uint32, rate FeeSatPerKB) (*tx.Transaction, error) {
+	return arbitrated.BuildArbitratedPoolOpeningState(fundingTxID, poolOutputIndex, poolAmount, roles, lockTime, rate)
+}
+
+func BuildArbitratedPoolState(input ArbitratedPoolStateInput) (*tx.Transaction, error) {
+	return arbitrated.BuildArbitratedPoolState(input)
+}
+
+func BuildArbitratedPoolFinalState(input ArbitratedPoolStateInput) (*tx.Transaction, error) {
+	return arbitrated.BuildArbitratedPoolFinalState(input)
+}
+
+func SignArbitratedPoolAsBuyer(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, key *ec.PrivateKey) ([]byte, error) {
+	return arbitrated.SignArbitratedPoolAsBuyer(state, poolAmount, roles, key)
+}
+
+func SignArbitratedPoolAsSeller(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, key *ec.PrivateKey) ([]byte, error) {
+	return arbitrated.SignArbitratedPoolAsSeller(state, poolAmount, roles, key)
+}
+
+func SignArbitratedPoolAsArbiter(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, key *ec.PrivateKey) ([]byte, error) {
+	return arbitrated.SignArbitratedPoolAsArbiter(state, poolAmount, roles, key)
+}
+
+func VerifyArbitratedPoolBuyerSignature(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, signature []byte) (bool, error) {
+	return arbitrated.VerifyArbitratedPoolBuyerSignature(state, poolAmount, roles, signature)
+}
+
+func VerifyArbitratedPoolSellerSignature(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, signature []byte) (bool, error) {
+	return arbitrated.VerifyArbitratedPoolSellerSignature(state, poolAmount, roles, signature)
+}
+
+func VerifyArbitratedPoolArbiterSignature(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, signature []byte) (bool, error) {
+	return arbitrated.VerifyArbitratedPoolArbiterSignature(state, poolAmount, roles, signature)
+}
+
+func MergeArbitratedPoolBuyerSellerSignatures(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, buyerSignature, sellerSignature []byte) (*tx.Transaction, error) {
+	return arbitrated.MergeArbitratedPoolBuyerSellerSignatures(state, poolAmount, roles, buyerSignature, sellerSignature)
+}
+
+func MergeArbitratedPoolBuyerArbiterSignatures(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, buyerSignature, arbiterSignature []byte) (*tx.Transaction, error) {
+	return arbitrated.MergeArbitratedPoolBuyerArbiterSignatures(state, poolAmount, roles, buyerSignature, arbiterSignature)
+}
+
+func MergeArbitratedPoolSellerArbiterSignatures(state *tx.Transaction, poolAmount uint64, roles ArbitratedPoolRoles, sellerSignature, arbiterSignature []byte) (*tx.Transaction, error) {
+	return arbitrated.MergeArbitratedPoolSellerArbiterSignatures(state, poolAmount, roles, sellerSignature, arbiterSignature)
+}

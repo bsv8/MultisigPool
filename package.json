@@ -1,7 +1,7 @@
 {
   "name": "keymaster-multisig-pool",
-  "version": "2.1.0",
-  "description": "A multisig pool implementation with TypeScript and Go support",
+  "version": "3.0.0",
+  "description": "A Buyer-Seller-Arbiter multisig pool implementation with TypeScript and Go support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -24,7 +24,7 @@
     "test": "jest",
     "test:go": "go test ./...",
     "test:all": "./scripts/test.sh",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint \"src/**/*.ts\"",
     "lint:go": "golangci-lint run",
     "clean": "rm -rf dist build coverage.out coverage.html",
     "prepublishOnly": "npm run build",
@@ -50,6 +50,9 @@
   "keywords": [
     "multisig",
     "pool",
+    "buyer",
+    "seller",
+    "arbiter",
     "blockchain",
     "typescript",
     "golang"

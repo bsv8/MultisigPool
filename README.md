@@ -1,93 +1,49 @@
-# MultisigPool
+# MultisigPool v3
 
-一个现代化的多签池实现，同时支持 TypeScript 和 Go 两种语言。
+MultisigPool v3 是 Buyer / Seller / Arbiter 角色明确的 BSV 多签池实现，提供 TypeScript、Go 和通用 Rust 多签能力。
 
-## 🚀 特性
+角色和链上顺序固定如下：
 
-- **双语言支持**: 提供 TypeScript SDK 和 Go 包
-- **标准化结构**: 采用业界最佳实践的项目结构
-- **完整的工具链**: 构建、测试、发布一体化
-- **类型安全**: TypeScript 和 Go 都提供完整的类型定义
-- **易于使用**: 简洁的 API 设计和详细的文档
+- 2-of-2：`[Buyer, Seller]`
+- 2-of-3：`[Buyer, Seller, Arbiter]`
+- 状态交易：`output[0] = Buyer`，`output[1] = Seller`
+- Buyer 提供建池 UTXO，并承担状态交易手续费；Arbiter 不占用资金输出。
 
-## 📁 项目结构
+协议标识是 `bitfs.pool.v3`，协议版本是 `3`。v3 是破坏性切换，不读取、迁移或兼容旧 v2 池。
 
-```
-MultisigPool/
-├── cmd/                    # Go 应用程序入口
-│   └── server/            # HTTP 服务器
-├── internal/              # Go 内部包（标准 Go 项目布局）
-│   ├── config/           # 配置管理
-│   ├── handler/          # HTTP 处理器
-│   ├── service/          # 业务逻辑
-│   ├── repository/       # 数据访问层
-│   └── middleware/       # 中间件
-├── pkg/                   # Go 公共包
-├── src/                   # TypeScript 源码
-├── dist/                  # TypeScript 构建输出
-├── build/                 # Go 构建输出
-├── test/                  # TypeScript 测试
-├── scripts/               # 构建和发布脚本
-└── docs/                  # 详细文档
+## TypeScript
+
+```ts
+import { PrivateKey } from '@bsv/sdk/primitives'
+import { buildArbitratedPoolLock, type ArbitratedPoolRoles } from 'keymaster-multisig-pool'
+
+const roles: ArbitratedPoolRoles = {
+  buyer: PrivateKey.fromHex('01'.padStart(64, '0')).toPublicKey(),
+  seller: PrivateKey.fromHex('02'.padStart(64, '0')).toPublicKey(),
+  arbiter: PrivateKey.fromHex('03'.padStart(64, '0')).toPublicKey(),
+}
+const lockingScript = buildArbitratedPoolLock(roles)
 ```
 
-## 🛠️ 快速开始
+公共签名合并函数显式覆盖 Buyer+Seller、Buyer+Arbiter、Seller+Arbiter 三种合法组合。
 
-### 安装依赖
+## Go
+
+Go module 路径是 `github.com/bsv8/MultisigPool/v3`。角色值对象位于 `pkg/two_party_pool` 和 `pkg/arbitrated_pool`，根包只重新导出 v3 API，不保留旧函数别名。
+
+```go
+roles := arbitrated_pool.ArbitratedPoolRoles{
+    Buyer: buyer.PubKey(), Seller: seller.PubKey(), Arbiter: arbiter.PubKey(),
+}
+lock, err := arbitrated_pool.BuildArbitratedPoolLock(roles)
+```
+
+## 验证
 
 ```bash
-make install
+npm run build
+npm test -- --runInBand
+go test ./...
 ```
 
-### 开发
-
-```bash
-make dev
-```
-
-### 构建
-
-```bash
-make build
-```
-
-### 测试
-
-```bash
-make test
-```
-
-## 📚 文档
-
-详细文档请查看 [docs/README.md](docs/README.md)
-
-## 🎯 改进点
-
-相比于原始的 KeymasterProto 项目，本项目在以下方面进行了改进：
-
-### Go 项目结构改进
-- ✅ 采用标准的 Go 项目布局（`cmd/`, `internal/`, `pkg/`）
-- ✅ 清晰的分层架构（handler, service, repository）
-- ✅ 配置管理独立模块
-- ✅ 接口驱动的设计
-
-### TypeScript 项目保持优势
-- ✅ 保持了原有的 npm 结构优势
-- ✅ 现代化的构建工具（tsup）
-- ✅ 完整的类型定义
-- ✅ 支持 ESM 和 CJS 双格式输出
-
-### 工具链改进
-- ✅ 统一的 Makefile 管理
-- ✅ 自动化的构建脚本
-- ✅ 完整的测试覆盖
-- ✅ 标准化的发布流程
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-MIT License
-keymaster multisig pool
+Rust 目录只保留通用 `m-of-n` 数学和脚本能力；涉及池角色的交叉验证使用同一套 v3 角色顺序。

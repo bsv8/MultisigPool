@@ -139,7 +139,9 @@ export default class MultiSig implements ScriptTemplate {
     return {
       sign: async (tx: Transaction, inputIndex: number): Promise<UnlockingScript> => {
         const script = this.sign(tx, inputIndex, privateKeys, publicKeys, m, sigHashType);
-        return new UnlockingScript(script.toBinary() as unknown as ScriptChunk[]);
+        const unlocking = new UnlockingScript();
+        unlocking.chunks = script.chunks;
+        return unlocking;
       },
       estimateLength: async (tx: Transaction, inputIndex: number): Promise<number> => {
         return this.estimateLength(m);
@@ -252,12 +254,12 @@ export default class MultiSig implements ScriptTemplate {
     const lockingScript = input.sourceTransaction?.outputs[input.sourceOutputIndex]?.lockingScript;
 
     if (!lockingScript) {
-      throw new Error('锁定脚本未设置，无法生成签名');
+      throw new Error('locking script is not set; cannot generate signature');
     }
 
     // 确保 sourceSatoshis 不为 undefined
     if (sourceSatoshis === undefined) {
-      throw new Error('源交易输出的 satoshis 值未设置，无法生成签名');
+      throw new Error('source transaction output satoshis is not set; cannot generate signature');
     }
 
     // 使用 TransactionSignature.format 计算签名哈希

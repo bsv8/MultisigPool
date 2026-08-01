@@ -1,9 +1,14 @@
 use crate::error::{MultisigError, Result};
-use crate::types::{PublicKey, PrivateKey, Transaction, TransactionInput, TransactionOutput};
-use wasm_bindgen::prelude::*;
-use sha2::{Sha256, Digest};
-use k256::{ecdsa::{Signature as EcdsaSignature, SigningKey, VerifyingKey}, SecretKey};
-use k256::elliptic_curve::rand_core::OsRng;
+use crate::types::{PrivateKey, PublicKey, Transaction};
+use k256::{
+    ecdsa::{
+        signature::{hazmat::PrehashSigner, SignatureEncoding},
+        Signature as EcdsaSignature, SigningKey,
+    },
+    SecretKey,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 const OP_0: u8 = 0x00;
 const OP_CHECKMULTISIG: u8 = 0xae;
@@ -36,6 +41,7 @@ impl VarInt {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Multisig {
     private_keys: Option<Vec<PrivateKey>>,
     public_keys: Vec<PublicKey>,
@@ -54,7 +60,7 @@ impl Multisig {
             return Err(MultisigError::InvalidPublicKeys);
         }
 
-        if m <= 0 || m > public_keys.len() {
+        if m == 0 || m > public_keys.len() {
             return Err(MultisigError::InvalidM(format!(
                 "m={} must be between 1 and n={}",
                 m,
@@ -68,17 +74,18 @@ impl Multisig {
             }
         }
 
+        let n = public_keys.len();
         Ok(Multisig {
             private_keys,
             public_keys,
             m,
-            n: public_keys.len(),
+            n,
             sig_hash_type: SIGHASH_ALL_FORKID,
         })
     }
 
     pub fn lock(&self) -> Result<Vec<u8>> {
-        if self.m <= 0 || self.m > self.n {
+        if self.m == 0 || self.m > self.n {
             return Err(MultisigError::InvalidM(format!(
                 "m={} must be between 1 and n={}",
                 self.m, self.n
@@ -89,7 +96,7 @@ impl Multisig {
         }
 
         let mut script = Vec::new();
-        
+
         script.push(0x01 + (self.m as u8) - 1);
 
         for pub_key in &self.public_keys {
@@ -110,9 +117,9 @@ impl Multisig {
             }
 
             let mut signatures = Vec::new();
-            
-            for i in 0..self.m {
-                let sig = self.sign_one(tx, input_index, &priv_keys[i])?;
+
+            for private_key in priv_keys.iter().take(self.m) {
+                let sig = self.sign_one(tx, input_index, private_key)?;
                 signatures.push(sig);
             }
 
@@ -122,7 +129,12 @@ impl Multisig {
         }
     }
 
-    pub fn sign_one(&self, tx: &Transaction, input_index: usize, private_key: &PrivateKey) -> Result<Vec<u8>> {
+    pub fn sign_one(
+        &self,
+        tx: &Transaction,
+        input_index: usize,
+        private_key: &PrivateKey,
+    ) -> Result<Vec<u8>> {
         if input_index >= tx.inputs.len() {
             return Err(MultisigError::TransactionError(
                 "Input index out of bounds".to_string(),
@@ -130,9 +142,9 @@ impl Multisig {
         }
 
         let sighash = self.calculate_signature_hash(tx, input_index)?;
-        
+
         let signature = self.generate_signature(&sighash, private_key)?;
-        
+
         Ok(signature)
     }
 
@@ -140,16 +152,19 @@ impl Multisig {
         // Simplified signature hash calculation for Bitcoin SV
         let mut hash_input = Vec::new();
         hash_input.extend_from_slice(&tx.version.to_le_bytes());
-        
+
         // Serialize inputs
-        let inputs_count = tx.inputs.len() as VarInt;
+        let inputs_count = VarInt(tx.inputs.len() as u64);
         hash_input.extend(inputs_count.serialize());
-        
+
         for (i, input) in tx.inputs.iter().enumerate() {
-            hash_input.extend_from_slice(&hex::decode(&input.source_txid).map_err(|_| 
-                MultisigError::TransactionError("Invalid source txid".to_string()))?);
+            hash_input.extend_from_slice(
+                &hex::decode(&input.source_txid).map_err(|_| {
+                    MultisigError::TransactionError("Invalid source txid".to_string())
+                })?,
+            );
             hash_input.extend_from_slice(&input.source_output_index.to_le_bytes());
-            
+
             if i == input_index {
                 // For the input being signed, use empty unlocking script for SIGHASH calculation
                 hash_input.extend(VarInt(0).serialize());
@@ -157,17 +172,17 @@ impl Multisig {
                 // For other inputs, use placeholder script
                 hash_input.extend(VarInt(0).serialize());
             }
-            
+
             hash_input.extend_from_slice(&input.sequence.to_le_bytes());
         }
 
         // Serialize outputs
-        let outputs_count = tx.outputs.len() as VarInt;
+        let outputs_count = VarInt(tx.outputs.len() as u64);
         hash_input.extend(outputs_count.serialize());
-        
+
         for output in &tx.outputs {
             hash_input.extend_from_slice(&output.satoshis.to_le_bytes());
-            let script_len = output.locking_script.len() as VarInt;
+            let script_len = VarInt(output.locking_script.len() as u64);
             hash_input.extend(script_len.serialize());
             hash_input.extend(&output.locking_script);
         }
@@ -177,7 +192,7 @@ impl Multisig {
 
         // Double SHA256 for Bitcoin
         let hash1 = Sha256::digest(&hash_input);
-        let hash2 = Sha256::digest(&hash1);
+        let hash2 = Sha256::digest(hash1);
         Ok(hash2.to_vec())
     }
 
@@ -185,16 +200,17 @@ impl Multisig {
         // Convert private key bytes to SecretKey
         let secret_key = SecretKey::from_slice(&private_key.key)
             .map_err(|_| MultisigError::InvalidPrivateKey)?;
-        
+
         let signing_key = SigningKey::from(secret_key);
-        let signature = signing_key.sign_digest(sighash.into())
+        let signature: EcdsaSignature = signing_key
+            .sign_prehash(sighash)
             .map_err(|_| MultisigError::SignatureError("Failed to create signature".to_string()))?;
-        
+
         // Convert to DER format and add SIGHASH type
         let der_sig = signature.to_der();
         let mut sig_with_hash = der_sig.to_vec();
         sig_with_hash.push(self.sig_hash_type);
-        
+
         Ok(sig_with_hash)
     }
 
@@ -241,8 +257,47 @@ impl Multisig {
     }
 }
 
-fn sha256(data: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().to_vec()
+#[cfg(test)]
+mod tests {
+    use super::Multisig;
+    use crate::types::{PrivateKey, PublicKey, Transaction, TransactionInput, TransactionOutput};
+
+    #[test]
+    fn supports_all_two_of_three_signature_pairs() {
+        let public_keys = vec![
+            PublicKey::new(vec![0x02; 33]),
+            PublicKey::new(vec![0x03; 33]),
+            PublicKey::new(vec![0x04; 33]),
+        ];
+        let transaction = Transaction::new(
+            1,
+            vec![TransactionInput::new("aa".repeat(32), 0, 1)],
+            vec![TransactionOutput::new(1000, vec![0x51])],
+            0,
+        );
+        let signer = Multisig::new(None, public_keys, 2).unwrap();
+        let buyer = signer
+            .sign_one(&transaction, 0, &PrivateKey::new(vec![1; 32]))
+            .unwrap();
+        let seller = signer
+            .sign_one(&transaction, 0, &PrivateKey::new(vec![2; 32]))
+            .unwrap();
+        let arbiter = signer
+            .sign_one(&transaction, 0, &PrivateKey::new(vec![3; 32]))
+            .unwrap();
+
+        let buyer_seller = signer
+            .build_sign_script(&[buyer.clone(), seller.clone()])
+            .unwrap();
+        let buyer_arbiter = signer
+            .build_sign_script(&[buyer.clone(), arbiter.clone()])
+            .unwrap();
+        let seller_arbiter = signer.build_sign_script(&[seller, arbiter]).unwrap();
+
+        assert_eq!(buyer_seller[0], 0);
+        assert_eq!(buyer_arbiter[0], 0);
+        assert_eq!(seller_arbiter[0], 0);
+        assert_ne!(buyer_seller, buyer_arbiter);
+        assert_ne!(buyer_arbiter, seller_arbiter);
+    }
 }

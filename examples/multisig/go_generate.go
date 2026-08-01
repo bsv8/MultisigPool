@@ -7,7 +7,7 @@ import (
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 
-	km "github.com/bsv8/MultisigPool/pkg/libs"
+	km "github.com/bsv8/MultisigPool/v3/pkg/libs"
 )
 
 type output struct {

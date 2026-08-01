@@ -1,0 +1,30 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { PrivateKey } from '@bsv/sdk/primitives';
+import Transaction from '@bsv/sdk/transaction/Transaction';
+import { buildArbitratedPoolLock, mergeArbitratedPoolBuyerArbiterSignatures, mergeArbitratedPoolBuyerSellerSignatures, mergeArbitratedPoolSellerArbiterSignatures, signArbitratedPoolAsArbiter, signArbitratedPoolAsBuyer, signArbitratedPoolAsSeller } from '../../src/arbitrated_pool';
+
+const fixture = JSON.parse(readFileSync(resolve('testdata/arbitrated_pool_v3_fixture.json'), 'utf8')) as { stateTxHex: string; poolAmount: number; sourceTxID: string };
+const buyer = PrivateKey.fromHex('a682814ac246ca65543197e593aa3b2633b891959c183416f54e2c63a8de1d8c');
+const seller = PrivateKey.fromHex('903b1b2c396f17203fa83444d72bf5c666119d9d681eb715520f99ae6f92322c');
+const arbiter = PrivateKey.fromHex('a2d2ca4c19e3c560792ca751842c29b9da94be09f712a7f9ba7c66e64a354829');
+const roles = { buyer: buyer.toPublicKey(), seller: seller.toPublicKey(), arbiter: arbiter.toPublicKey() };
+const state = Transaction.fromHex(fixture.stateTxHex);
+const source = new Transaction();
+source.outputs = [{ satoshis: fixture.poolAmount, lockingScript: buildArbitratedPoolLock(roles) }];
+state.inputs[0].sourceTransaction = source;
+const buyerSignature = signArbitratedPoolAsBuyer(state, fixture.poolAmount, roles, buyer);
+const sellerSignature = signArbitratedPoolAsSeller(state, fixture.poolAmount, roles, seller);
+const arbiterSignature = signArbitratedPoolAsArbiter(state, fixture.poolAmount, roles, arbiter);
+const finalBuyerSeller = mergeArbitratedPoolBuyerSellerSignatures(state, fixture.poolAmount, roles, buyerSignature, sellerSignature);
+const finalBuyerArbiter = mergeArbitratedPoolBuyerArbiterSignatures(state, fixture.poolAmount, roles, buyerSignature, arbiterSignature);
+const finalSellerArbiter = mergeArbitratedPoolSellerArbiterSignatures(state, fixture.poolAmount, roles, sellerSignature, arbiterSignature);
+
+console.log(`LockHex ${source.outputs[0].lockingScript.toHex()}`);
+console.log(`StateHex ${state.toHex()}`);
+console.log(`BuyerSignatureHex ${Buffer.from(buyerSignature).toString('hex')}`);
+console.log(`SellerSignatureHex ${Buffer.from(sellerSignature).toString('hex')}`);
+console.log(`ArbiterSignatureHex ${Buffer.from(arbiterSignature).toString('hex')}`);
+console.log(`FinalBuyerSellerHex ${finalBuyerSeller.toHex()}`);
+console.log(`FinalBuyerArbiterHex ${finalBuyerArbiter.toHex()}`);
+console.log(`FinalSellerArbiterHex ${finalSellerArbiter.toHex()}`);

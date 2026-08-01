@@ -1,3 +1,6 @@
+use thiserror::Error;
+use wasm_bindgen::JsValue;
+
 #[derive(Error, Debug)]
 pub enum MultisigError {
     #[error("Invalid public keys")]

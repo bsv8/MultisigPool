@@ -1,56 +1,46 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Go 模块发布脚本
-set -e
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "🚀 发布 Go 模块..."
+echo "Publishing the Go module..."
 
-# 检查是否有未提交的更改
-if ! git diff --quiet; then
-    echo "❌ 有未提交的更改，请先提交代码"
+if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+    echo "ERROR: working tree contains tracked, staged, or untracked changes" >&2
     exit 1
 fi
 
 # 检查是否在正确的分支
 CURRENT_BRANCH=$(git branch --show-current)
 if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
-    echo "⚠️  当前不在主分支，当前分支: $CURRENT_BRANCH"
-    read -p "是否继续发布? (y/N): " -n 1 -r
+    echo "ERROR: current branch is not main or master: $CURRENT_BRANCH" >&2
+    read -r -p "Continue publishing? (y/N): " -n 1 REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
 fi
 
-# 运行测试
-echo "🧪 运行测试..."
-go test ./pkg/...
-
-# 运行 go mod tidy
-echo "🧹 整理依赖..."
-go mod tidy
-
-# 获取当前版本
-CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-echo "当前版本: $CURRENT_VERSION"
+bash scripts/run_all_tests.sh
 
 # 询问新版本
-read -p "输入新版本号 (例如 v1.0.0): " NEW_VERSION
+read -r -p "Enter the new version (for example v1.0.0): " NEW_VERSION
 
 if [ -z "$NEW_VERSION" ]; then
-    echo "❌ 版本号不能为空"
+    echo "ERROR: version must not be empty" >&2
     exit 1
 fi
 
 # 验证版本号格式
 if ! [[ $NEW_VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "❌ 版本号格式不正确，应该是 vX.Y.Z 格式"
+    echo "ERROR: version must match vX.Y.Z" >&2
     exit 1
 fi
 
 # 构建项目确保没有编译错误
-echo "🔨 构建项目..."
-go build ./...
+echo "Running the release gate after selecting the version..."
+bash scripts/run_all_tests.sh
 
 # 创建 git tag
 echo "🏷️  创建 git tag: $NEW_VERSION"
@@ -71,9 +61,9 @@ else
 fi
 
 # 通知 Go 模块代理
-echo "🔄 通知 Go 模块代理..."
-curl -X POST "https://proxy.golang.org/github.com/bsv8/MultisigPool/@v/$NEW_VERSION.info" || true
+echo "Notifying the Go module proxy..."
+curl --fail --silent --show-error --request POST "https://proxy.golang.org/github.com/bsv8/MultisigPool/v3/@v/$NEW_VERSION.info"
 
 echo "✅ Go 模块发布完成!"
-echo "📦 模块地址: github.com/bsv8/MultisigPool@$NEW_VERSION"
-echo "🔗 导入方式: go get github.com/bsv8/MultisigPool@$NEW_VERSION" 
+echo "📦 模块地址: github.com/bsv8/MultisigPool/v3@$NEW_VERSION"
+echo "🔗 导入方式: go get github.com/bsv8/MultisigPool/v3@$NEW_VERSION"

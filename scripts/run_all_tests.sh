@@ -1,26 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "=== Running All Tests ==="
-echo
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "1. Running TypeScript Tests..."
-echo "================================"
-npm test tests/
-
-echo
-echo "2. Running Go Tests..."
-echo "======================"
-go test ./pkg/... -v
-
-echo
-echo "3. Running Integration Tests..."
-echo "==============================="
-echo "Running dual endpoint comparison test..."
-go run examples/txtest/compare.go
-
-echo
-echo "Running triple endpoint comparison test..."
-go run examples/triplextest/compare.go
-
-echo
-echo "=== All Tests Completed ==="
+npm test -- --runInBand
+npm run lint
+npm run build
+go vet ./...
+go test ./...
+go run examples/two_party_pool_compare/compare.go
+go run examples/arbitrated_pool_compare/compare.go
+if rg -n -i '\b(server|client)\b|serverAmount|clientAmount|SignAsA|SignAsB|3-of-2' \
+  pkg src tests testdata examples docs README.md RUST_IMPLEMENTATION.md PACKAGING.md; then
+  echo "legacy role identifiers were found in the public source or documentation" >&2
+  exit 1
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo is required for the Rust release gate" >&2
+  exit 1
+fi
+cargo fmt --manifest-path rust/Cargo.toml -- --check
+cargo test --manifest-path rust/Cargo.toml --locked
+cargo clippy --manifest-path rust/Cargo.toml --all-targets --all-features -- --deny warnings
+cargo fmt --manifest-path examples/rust_go_comparison/Cargo.toml -- --check
+cargo test --manifest-path examples/rust_go_comparison/Cargo.toml --locked
+cargo clippy --manifest-path examples/rust_go_comparison/Cargo.toml --all-targets --all-features -- --deny warnings
+bash examples/rust_go_comparison/run_cross_validation.sh

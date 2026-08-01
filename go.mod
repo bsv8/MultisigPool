@@ -1,4 +1,4 @@
-module github.com/bsv8/MultisigPool
+module github.com/bsv8/MultisigPool/v3
 
 go 1.24.3
 

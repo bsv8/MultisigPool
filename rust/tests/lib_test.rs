@@ -1,6 +1,5 @@
-use wasm_bindgen_test::*;
 use keymaster_multisig::*;
-use serde_json;
+use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -18,7 +17,7 @@ fn test_create_multisig() {
     ];
 
     let multisig = Multisig::new(Some(private_keys), public_keys, 2).unwrap();
-    
+
     assert_eq!(multisig.get_m(), 2);
     assert_eq!(multisig.get_n(), 3);
     assert_eq!(multisig.get_sig_hash_type(), 0x41);
@@ -33,7 +32,7 @@ fn test_lock_script() {
 
     let multisig = Multisig::new(None, public_keys, 2).unwrap();
     let script = multisig.lock().unwrap();
-    
+
     // OP_2 (0x52) + pubkey1 length + pubkey1 + pubkey2 length + pubkey2 + OP_2 (0x52) + OP_CHECKMULTISIG (0xae)
     assert_eq!(script[0], 0x52); // OP_2
     assert_eq!(script[34], 0x52); // OP_2
@@ -49,7 +48,7 @@ fn test_estimate_length() {
 
     let multisig = Multisig::new(None, public_keys, 2).unwrap();
     let length = multisig.estimate_length();
-    
+
     // OP_0 + 2 * (72 bytes signature + 1 byte SIGHASH)
     assert_eq!(length, 1 + 2 * 73);
 }
@@ -68,17 +67,14 @@ fn test_fake_sign() {
 
     let multisig = Multisig::new(Some(private_keys), public_keys, 2).unwrap();
     let script = multisig.create_fake_sign().unwrap();
-    
+
     assert_eq!(script[0], 0x00); // OP_0
     assert_eq!(script.len(), 1 + 2 * 73); // OP_0 + 2 fake signatures
 }
 
 #[wasm_bindgen_test]
 fn test_build_sign_script() {
-    let signatures = vec![
-        vec![0x01; 72],
-        vec![0x02; 72],
-    ];
+    let signatures = vec![vec![0x01; 72], vec![0x02; 72]];
 
     let public_keys = vec![
         PublicKey::new(vec![0x02; 33]),
@@ -87,7 +83,7 @@ fn test_build_sign_script() {
 
     let multisig = Multisig::new(None, public_keys, 2).unwrap();
     let script = multisig.build_sign_script(&signatures).unwrap();
-    
+
     assert_eq!(script[0], 0x00); // OP_0
     assert_eq!(script[1], 72); // First signature length
     assert_eq!(script[74], 72); // Second signature length
