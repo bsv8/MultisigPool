@@ -6,8 +6,7 @@ import { PrivateKey } from '@bsv/sdk/primitives';
 import {
   tripleBuildFeePoolBaseTx,
   tripleBuildFeePoolSpendTX,
-  tripleSpendTXFeePoolBSign,
-  tripleFeePoolLoadArbitrationTx,
+  tripleFeePoolLoadTx,
   tripleClientBFeePoolSpendTXUpdateSign,
   tripleServerFeePoolSpendTXUpdateSign,
   tripleMergeFeePoolSigForSpendTx,
@@ -23,14 +22,12 @@ interface Fixture {
   serverPrivHex: string;
   escrowPrivHex: string;
   clientUtxos: FixtureUTXO[];
-  feePerByte: number;
+  feePerKB: number;
   endHeight: number;
   isMain: boolean;
   arbitration: {
     sequenceNumber: number;
     sellerAmount: number;
-    arbiterFee: number;
-    proofHex: string;
   };
 }
 
@@ -50,8 +47,7 @@ function loadFixture(): Fixture {
   const serverPriv = PrivateKey.fromHex(fixture.serverPrivHex);
   const escrowPriv = PrivateKey.fromHex(fixture.escrowPrivHex);
 
-  const feeRate = fixture.feePerByte;
-  const proofBytes = Uint8Array.from(Buffer.from(fixture.arbitration.proofHex, 'hex'));
+  const feeRate = fixture.feePerKB;
 
   /* ------------------------------------------------------------------
    * Step-1  Build pool funding (base) transaction
@@ -82,17 +78,16 @@ function loadFixture(): Fixture {
 
   const spendTx = spendResp.tx;
   const buyerSig = spendResp.clientSignBytes;
+  console.log('StateTxHex:', spendTx.toHex());
 
   /* ------------------------------------------------------------------
    * Step-3  Server adds its signature
    * ------------------------------------------------------------------ */
-  const serverSig = await tripleSpendTXFeePoolBSign(
+  const serverSig = await tripleServerFeePoolSpendTXUpdateSign(
     spendTx,
-    poolValue,                     // 使用原始池子金额（step1.Amount）而不是扣费后的金额
-    serverPriv.toPublicKey(),
+    serverPriv,
     clientPriv.toPublicKey(),
-    escrowPriv.toPublicKey(),      // 传递 escrow 公钥而不是 server 私钥
-    escrowPriv,                    // 使用 escrow 私钥进行签名，与 Go 保持一致
+    escrowPriv.toPublicKey(),
   );
 
   // 输出签名用于交叉比对
@@ -100,19 +95,17 @@ function loadFixture(): Fixture {
   console.log('SellerSig:', Buffer.from(serverSig).toString('hex'));
 
   /* ------------------------------------------------------------------
-   * Step-4  仲裁更新交易（卖方金额 + 仲裁费 + OP_RETURN 证据）
+   * Step-4  仲裁更新交易（固定两输出：server + A）
    * ------------------------------------------------------------------ */
-  const arbitrationTx = await tripleFeePoolLoadArbitrationTx(
+  const arbitrationTx = await tripleFeePoolLoadTx(
     spendTx,
     serverPriv.toPublicKey(),
     clientPriv.toPublicKey(),
     escrowPriv.toPublicKey(),
     poolValue,
-    fixture.arbitration.arbiterFee,
     undefined,
     fixture.arbitration.sequenceNumber,
     fixture.arbitration.sellerAmount,
-    proofBytes,
   );
   console.log('ArbitrationTxHex:', arbitrationTx.toHex());
 

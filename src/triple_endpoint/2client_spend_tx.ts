@@ -2,7 +2,7 @@ import { PrivateKey, PublicKey } from '@bsv/sdk/primitives';
 // import Script from '@bsv/sdk/script/Script';
 import Transaction from '@bsv/sdk/transaction/Transaction';
 import TransactionSignature from '@bsv/sdk/primitives/TransactionSignature';
-import LockingScript from '@bsv/sdk/script/LockingScript';
+import UnlockingScript from '@bsv/sdk/script/UnlockingScript';
 // import { BaseChain } from '../tx/BaseChain';
 // import type { UTXO, BuildDualFeePoolBaseTxResponse } from '../tx/types';
 // import { TripleEndpointPool_1base_tx } from './triple_endpoint_pool_1base_tx';
@@ -12,7 +12,6 @@ import LockingScript from '@bsv/sdk/script/LockingScript';
 // import { fromBase58Check } from '@bsv/sdk/primitives/utils';
 import MultiSig from '../libs/MULTISIG';
 import P2PKH from '../libs/P2PKH';
-import { buildOptionalOpReturnScript, type OpReturnPayload } from '../libs/OP_RETURN';
 import { estimateSerializedTxSize } from '../libs/TX_SIZE';
 // import unlock from 'lucide-svelte/icons/unlock';
 
@@ -59,13 +58,11 @@ interface TripleSpendTxResponse {
     aPrivateKey: PrivateKey,
     bPublicKey: PublicKey,
     feeRate: number,
-    paymentProof?: OpReturnPayload | null,
   ): Promise<TripleSpendTxResponse> {
     try {
       // const prevTxId = aTx.id('hex');
       const aPublicKey = aPrivateKey.toPublicKey();
       const aAddress = aPublicKey.toAddress();
-      const bAddress = bPublicKey.toAddress();
       
       // 创建交易对象
       const tx = new Transaction();
@@ -91,7 +88,7 @@ interface TripleSpendTxResponse {
       };
       
       // 创建服务器找零脚本（P2PKH）
-      const serverChangeScript = new P2PKH().lock(bPublicKey);
+      const serverChangeScript = new P2PKH().lock(serverPublicKey);
       
       // 添加服务器输出
       tx.addOutput({
@@ -108,19 +105,12 @@ interface TripleSpendTxResponse {
         satoshis: serverValue, // 初始设置为服务器提供的金额
       });
 
-      const opReturnScript = buildOptionalOpReturnScript(paymentProof);
-      if (opReturnScript) {
-        const opReturnLockingScript = new LockingScript();
-        opReturnLockingScript.chunks = opReturnScript.chunks;
-        tx.addOutput({
-          lockingScript: opReturnLockingScript,
-          satoshis: 0,
-        });
-      }
-      
       // 计算交易大小和费用
       const txSize = estimateSerializedTxSize(tx);
-      let fee = Math.floor((txSize / 1000.0) * feeRate);
+      if (!Number.isInteger(feeRate) || feeRate < 0) {
+        throw new Error('feeRate must be a non-negative integer sat/KB rate');
+      }
+      let fee = Math.ceil((txSize * feeRate) / 1000);
       
       if (serverValue < fee) {
         throw new Error(`余额不足，需要 ${fee}，拥有 ${serverValue}`);
@@ -141,8 +131,10 @@ interface TripleSpendTxResponse {
         TransactionSignature.SIGHASH_ALL | TransactionSignature.SIGHASH_FORKID
       );
 
-      console.log('A方签名字节:', SignOne.toString('hex'));
-      
+      // Partial signatures are returned separately; state transactions never
+      // carry fake or stale unlocking bytes across the API boundary.
+      tx.inputs[0].unlockingScript = new UnlockingScript();
+
       return {
         tx: tx,
         clientSignBytes: SignOne,
@@ -154,25 +146,4 @@ interface TripleSpendTxResponse {
     }
   }
 
-  export async function tripleBuildFeePoolSpendTXWithProof(
-    prevTxId: string,
-    serverValue: number,
-    endHeight: number,
-    serverPublicKey: PublicKey,
-    aPrivateKey: PrivateKey,
-    bPublicKey: PublicKey,
-    feeRate: number,
-    paymentProof?: OpReturnPayload | null,
-  ): Promise<TripleSpendTxResponse> {
-    return tripleBuildFeePoolSpendTX(
-      prevTxId,
-      serverValue,
-      endHeight,
-      serverPublicKey,
-      aPrivateKey,
-      bPublicKey,
-      feeRate,
-      paymentProof,
-    );
-  }
 // }

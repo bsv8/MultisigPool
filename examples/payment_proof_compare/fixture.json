@@ -27,7 +27,7 @@
         "satoshis": 19996
       }
     ],
-    "feeRate": 1.2,
+    "feeRate": 1,
     "isMain": false
   }
 }

@@ -26,8 +26,6 @@ type Fixture struct {
 	Arbitration   struct {
 		SequenceNumber uint32 `json:"sequenceNumber"`
 		SellerAmount   uint64 `json:"sellerAmount"`
-		ArbiterFee     uint64 `json:"arbiterFee"`
-		ProofHex       string `json:"proofHex"`
 	} `json:"arbitration"`
 }
 
@@ -100,6 +98,7 @@ func main() {
 	}
 
 	// Print signatures hex for debugging
+	fmt.Printf("StateTxHex: %s\n", tx2.Hex())
 	fmt.Printf("BuyerSig: %x\n", *clientSignBytes)
 	fmt.Printf("SellerSig: %x\n", *serverSignBytes)
 

@@ -5,14 +5,12 @@ import MultiSig from '../../src/libs/MULTISIG';
 import {
   tripleBuildFeePoolBaseTx,
   tripleBuildFeePoolSpendTX,
-  tripleBuildFeePoolSpendTXWithProof,
   tripleClientBFeePoolSpendTXUpdateSign,
-  tripleFeePoolLoadArbitrationTx,
+  tripleFeePoolLoadTx,
   tripleMergeFeePoolSigForSpendTx,
   tripleServerFeePoolSpendTXUpdateSign,
   tripleSpendTXFeePoolBSign,
 } from '../../src/triple_endpoint';
-import { buildOptionalOpReturnScript } from '../../src/libs/OP_RETURN';
 import { clientVerifyServerSig, serverVerifyClientBSig } from '../../src/triple_endpoint/6verify';
 
 interface TestUTXO {
@@ -33,7 +31,7 @@ describe('Triple Endpoint Tests', () => {
         satoshis: 19996
       }
     ],
-    feePerByte: 1.2,
+    feePerByte: 1,
   };
 
   test('should build triple endpoint fee pool transactions correctly', async () => {
@@ -174,12 +172,10 @@ describe('Triple Endpoint Tests', () => {
     expect(scriptHex.endsWith('53ae')).toBe(true);
   });
 
-  test('should append binary payment proof as the last output', async () => {
+  test('should keep every pool state at exactly two outputs', async () => {
     const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
     const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
     const escrowPriv = PrivateKey.fromHex(testData.escrowPrivHex);
-    const proof = Uint8Array.from([0x00, 0x01, 0xff, 0x10, 0x70, 0x61, 0x79, 0x80]);
-
     const { tx: baseTx } = await tripleBuildFeePoolBaseTx(
       testData.clientUtxos,
       serverPriv.toPublicKey(),
@@ -189,7 +185,7 @@ describe('Triple Endpoint Tests', () => {
     );
 
     const poolValue = baseTx.outputs[0].satoshis as number;
-    const spendResp = await tripleBuildFeePoolSpendTXWithProof(
+    const spendResp = await tripleBuildFeePoolSpendTX(
       baseTx.id('hex'),
       poolValue,
       0,
@@ -197,21 +193,17 @@ describe('Triple Endpoint Tests', () => {
       clientPriv,
       escrowPriv.toPublicKey(),
       testData.feePerByte,
-      proof,
     );
 
-    expect(spendResp.tx.outputs.length).toBe(3);
+    expect(spendResp.tx.outputs.length).toBe(2);
     expect(spendResp.tx.outputs[0].satoshis).toBe(0);
     expect(spendResp.tx.outputs[1].satoshis).toBe(spendResp.amount);
-    expect(spendResp.tx.outputs[2].satoshis).toBe(0);
-    expect(spendResp.tx.outputs[2].lockingScript.toHex()).toBe(buildOptionalOpReturnScript(proof)!.toHex());
   });
 
-  test('should keep arbitration output order as B,A,arbiter_fee,OP_RETURN', async () => {
+  test('should keep arbitration state at server,A with no third output', async () => {
     const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
     const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
     const escrowPriv = PrivateKey.fromHex(testData.escrowPrivHex);
-    const proof = Uint8Array.from([0xaa, 0xbb, 0xcc]);
 
     const { tx: baseTx } = await tripleBuildFeePoolBaseTx(
       testData.clientUtxos,
@@ -230,33 +222,27 @@ describe('Triple Endpoint Tests', () => {
       escrowPriv.toPublicKey(),
       testData.feePerByte,
     );
-    const arbiterFee = 333;
     const sellerAmount = 1111;
-    const arbitrationTx = await tripleFeePoolLoadArbitrationTx(
+    const arbitrationTx = await tripleFeePoolLoadTx(
       spendResp.tx,
       serverPriv.toPublicKey(),
       clientPriv.toPublicKey(),
       escrowPriv.toPublicKey(),
       poolValue,
-      arbiterFee,
       undefined,
       9,
       sellerAmount,
-      proof,
     );
 
-    expect(arbitrationTx.outputs.length).toBe(4);
+    expect(arbitrationTx.outputs.length).toBe(2);
     expect(arbitrationTx.outputs[0].satoshis).toBe(sellerAmount);
-    expect(arbitrationTx.outputs[2].satoshis).toBe(arbiterFee);
-    expect(arbitrationTx.outputs[3].satoshis).toBe(0);
-    expect(arbitrationTx.outputs[3].lockingScript.toHex()).toBe(buildOptionalOpReturnScript(proof)!.toHex());
+    expect(arbitrationTx.outputs[1].satoshis).toBe(spendResp.amount - sellerAmount);
   });
 
   test('should sign arbitration tx by arbiter and seller then merge', async () => {
     const clientPriv = PrivateKey.fromHex(testData.clientPrivHex);
     const serverPriv = PrivateKey.fromHex(testData.serverPrivHex);
     const escrowPriv = PrivateKey.fromHex(testData.escrowPrivHex);
-    const proof = Uint8Array.from(Buffer.from('arb-proof', 'utf8'));
 
     const { tx: baseTx } = await tripleBuildFeePoolBaseTx(
       testData.clientUtxos,
@@ -276,17 +262,15 @@ describe('Triple Endpoint Tests', () => {
       testData.feePerByte,
     );
 
-    const arbitrationTx = await tripleFeePoolLoadArbitrationTx(
+    const arbitrationTx = await tripleFeePoolLoadTx(
       spendResp.tx,
       serverPriv.toPublicKey(),
       clientPriv.toPublicKey(),
       escrowPriv.toPublicKey(),
       poolValue,
-      333,
       undefined,
       9,
       1111,
-      proof,
     );
 
     const arbiterSig = await tripleServerFeePoolSpendTXUpdateSign(

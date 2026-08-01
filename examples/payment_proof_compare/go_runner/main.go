@@ -86,11 +86,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("build triple base tx: %v", err)
 	}
-	tripleSpend, _, tripleAmount, err := triple.BuildTripleFeePoolSpendTXWithProof(tripleBase.Tx, tripleBase.Amount, 0, tripleServerPriv.PubKey(), tripleClientPriv, tripleEscrowPriv.PubKey(), f.Triple.IsMain, f.Triple.FeeRate, proof)
+	tripleSpend, _, tripleAmount, err := triple.BuildTripleFeePoolSpendTX(tripleBase.Tx, tripleBase.Amount, 0, tripleServerPriv.PubKey(), tripleClientPriv, tripleEscrowPriv.PubKey(), f.Triple.IsMain, f.Triple.FeeRate)
 	if err != nil {
 		log.Fatalf("build triple spend tx: %v", err)
 	}
 	fmt.Printf("TripleOutputCount: %d\n", len(tripleSpend.Outputs))
-	fmt.Printf("TripleProofScriptHex: %x\n", tripleSpend.Outputs[len(tripleSpend.Outputs)-1].LockingScript.Bytes())
 	fmt.Printf("TripleClientAmount: %d\n", tripleAmount)
 }

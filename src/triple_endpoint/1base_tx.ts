@@ -66,6 +66,9 @@ import { estimateSerializedTxSize } from '../libs/TX_SIZE';
     bPublicKey: PublicKey,
     feeRate: number,
   ): Promise<BuildDualFeePoolBaseTxResponse> {
+    if (!Number.isInteger(feeRate) || feeRate < 0) {
+      throw new Error('feeRate must be a non-negative integer sat/KB rate');
+    }
     // 检查输入参数
     if (!clientUtxos || clientUtxos.length === 0) {
       throw new Error('客户端 UTXO 列表不能为空');
@@ -136,12 +139,12 @@ import { estimateSerializedTxSize } from '../libs/TX_SIZE';
     
     // 计算交易大小（字节）和手续费
     const txSize = estimateSerializedTxSize(tx);
-    let fee = Math.floor((txSize / 1000.0) * feeRate);
+    let fee = Math.ceil((txSize * feeRate) / 1000);
     if (fee === 0) {
       fee = 1; // 最低手续费为 1 satoshi
     }
     
-    console.debug(`计算手续费: ${fee} satoshis, 交易大小: ${txSize} bytes, 费率: ${feeRate} sat/byte`);
+    console.debug(`计算手续费: ${fee} satoshis, 交易大小: ${txSize} bytes, 费率: ${feeRate} sat/KB`);
     
     // 更新输出金额，减去手续费
     tx.outputs[0].satoshis = totalValue - fee;

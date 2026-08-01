@@ -7,7 +7,7 @@ import (
 	"regexp"
 )
 
-var proofRegexp = regexp.MustCompile(`(DualOutputCount|DualProofScriptHex|DualClientAmount|TripleOutputCount|TripleProofScriptHex|TripleClientAmount):\s*([0-9a-fA-F]+)`)
+var proofRegexp = regexp.MustCompile(`(DualOutputCount|DualProofScriptHex|DualClientAmount|TripleOutputCount|TripleClientAmount):\s*([0-9a-fA-F]+)`)
 
 func capture(cmd *exec.Cmd) (map[string]string, error) {
 	var out bytes.Buffer
@@ -22,8 +22,8 @@ func capture(cmd *exec.Cmd) (map[string]string, error) {
 	for _, match := range matches {
 		result[string(match[1])] = string(match[2])
 	}
-	if len(result) != 6 {
-		return nil, fmt.Errorf("expected 6 outputs, got %d: %s", len(result), out.String())
+	if len(result) != 5 {
+		return nil, fmt.Errorf("expected 5 outputs, got %d: %s", len(result), out.String())
 	}
 	return result, nil
 }
@@ -46,7 +46,6 @@ func main() {
 		"DualProofScriptHex",
 		"DualClientAmount",
 		"TripleOutputCount",
-		"TripleProofScriptHex",
 		"TripleClientAmount",
 	}
 	pass := true
@@ -57,7 +56,7 @@ func main() {
 		}
 	}
 	if pass {
-		fmt.Println("PASS: payment proof outputs are identical between Go and TS")
+		fmt.Println("PASS: canonical triple pool has no proof output; dual proof remains unchanged")
 	} else {
 		fmt.Println("FAIL: payment proof outputs differ between Go and TS")
 	}

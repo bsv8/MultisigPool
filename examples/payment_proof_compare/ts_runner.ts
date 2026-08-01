@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { PrivateKey } from '@bsv/sdk/primitives';
 import { buildDualFeePoolBaseTx, buildDualFeePoolSpendTXWithProof } from '../../src/dual_endpoint';
-import { tripleBuildFeePoolBaseTx, tripleBuildFeePoolSpendTXWithProof } from '../../src/triple_endpoint';
+import { tripleBuildFeePoolBaseTx, tripleBuildFeePoolSpendTX } from '../../src/triple_endpoint';
 
 interface UtxoFixture {
   txid: string;
@@ -75,7 +75,7 @@ function loadFixture(): Fixture {
     fixture.triple.feeRate,
   );
   const poolValue = tripleBase.tx.outputs[0].satoshis as number;
-  const tripleSpend = await tripleBuildFeePoolSpendTXWithProof(
+  const tripleSpend = await tripleBuildFeePoolSpendTX(
     tripleBase.tx.id('hex'),
     poolValue,
     0,
@@ -83,9 +83,7 @@ function loadFixture(): Fixture {
     tripleClientPriv,
     tripleEscrowPriv.toPublicKey(),
     fixture.triple.feeRate,
-    proof,
   );
   console.log(`TripleOutputCount: ${tripleSpend.tx.outputs.length}`);
-  console.log(`TripleProofScriptHex: ${tripleSpend.tx.outputs[tripleSpend.tx.outputs.length - 1].lockingScript.toHex()}`);
   console.log(`TripleClientAmount: ${tripleSpend.amount}`);
 })();

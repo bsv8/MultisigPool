@@ -15,7 +15,7 @@ describe('Triple Endpoint Signature Verification', () => {
     clientUtxos: [
       { txid: '02c0b306d50088680b4f5f1d37bba2', vout: 0, satoshis: 20000 },
     ],
-    feeRate: 0.5,
+    feeRate: 1,
   } as any;
 
   test('verifies A-client and server signatures for spend tx', async () => {
