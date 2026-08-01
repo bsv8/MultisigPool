@@ -116,13 +116,62 @@ test('解析错误消息使用英文', () => {
   });
 });
 
-test('check 能发现镜像文件被篡改', () => {
-  withFixture((rootDirectory) => {
-    const packagePath = path.join(rootDirectory, 'package.json');
-    const packageText = fs.readFileSync(packagePath, 'utf8');
-    fs.writeFileSync(packagePath, packageText.replace('  "version": "3.0.0",', '  "version": "9.9.9",'));
-    assert.match(collectRepositoryErrors(rootDirectory).join('\n'), /package\.json: version expected "3\.0\.0", actual "9\.9\.9"/);
-  });
+test('check 能发现所有版本镜像文件被篡改', () => {
+  const cases = [
+    {
+      name: 'package.json',
+      relativePath: 'package.json',
+      mutate: (text) => text.replace('  "version": "3.0.0",', '  "version": "9.9.9",'),
+      expected: /package\.json: version expected "3\.0\.0", actual "9\.9\.9"/,
+    },
+    {
+      name: 'package-lock.json',
+      relativePath: 'package-lock.json',
+      mutate: (text) => text.replace('  "version": "3.0.0",', '  "version": "9.9.9",'),
+      expected: /package-lock\.json: version expected "3\.0\.0", actual "9\.9\.9"/,
+    },
+    {
+      name: 'rust/Cargo.toml',
+      relativePath: 'rust/Cargo.toml',
+      mutate: (text) => text.replace('version = "0.2.0"', 'version = "0.2.1"'),
+      expected: /rust\/Cargo\.toml: package\.version expected "0\.2\.0", actual "0\.2\.1"/,
+    },
+    {
+      name: 'rust/Cargo.lock',
+      relativePath: 'rust/Cargo.lock',
+      mutate: (text) => text.replace('name = "keymaster-multisig-rust"\nversion = "0.2.0"', 'name = "keymaster-multisig-rust"\nversion = "0.2.1"'),
+      expected: /rust\/Cargo\.lock: keymaster-multisig-rust version expected "0\.2\.0", actual "0\.2\.1"/,
+    },
+    {
+      name: 'internal/versioninfo/version.go',
+      relativePath: 'internal/versioninfo/version.go',
+      mutate: (text) => text.replace('const GoReleaseVersion = "3.0.0"', 'const GoReleaseVersion = "9.9.9"'),
+      expected: /internal\/versioninfo\/version\.go: GoReleaseVersion expected "3\.0\.0", actual "9\.9\.9"/,
+    },
+    {
+      name: 'src/version.ts',
+      relativePath: 'src/version.ts',
+      mutate: (text) => text.replace("export const ReleaseVersion = '3.0.0'", "export const ReleaseVersion = '9.9.9'"),
+      expected: /src\/version\.ts: ReleaseVersion expected "3\.0\.0", actual "9\.9\.9"/,
+    },
+    {
+      name: 'rust/src/version.rs',
+      relativePath: 'rust/src/version.rs',
+      mutate: (text) => text.replace('pub const RELEASE_VERSION: &str = "0.2.0"', 'pub const RELEASE_VERSION: &str = "0.2.1"'),
+      expected: /rust\/src\/version\.rs: RELEASE_VERSION expected "0\.2\.0", actual "0\.2\.1"/,
+    },
+  ];
+
+  for (const { name, relativePath, mutate, expected } of cases) {
+    withFixture((rootDirectory) => {
+      const filePath = path.join(rootDirectory, relativePath);
+      const original = fs.readFileSync(filePath, 'utf8');
+      const changed = mutate(original);
+      assert.notEqual(changed, original, `${name} mutation did not change the fixture`);
+      fs.writeFileSync(filePath, changed);
+      assert.match(collectRepositoryErrors(rootDirectory).join('\n'), expected, `${name} mutation was not detected`);
+    });
+  }
 });
 
 test('check 拒绝 Cargo manifest 的占位 repository', () => {

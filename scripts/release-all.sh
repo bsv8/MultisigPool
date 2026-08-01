@@ -528,7 +528,7 @@ run_external_preflight() {
   run_npm_pack_dry_run
   prepare_npm_artifact
   echo '运行 Rust crate dry-run...'
-  cargo publish --dry-run --manifest-path rust/Cargo.toml
+  cargo publish --dry-run --registry crates-io --manifest-path rust/Cargo.toml
   echo '验证 Go module 消费者编译...'
   check_go_module_consumer
 
@@ -595,7 +595,7 @@ execute_release_step() {
       ;;
     publish-npm)
       echo "发布 npm 包 $PACKAGE_NAME@$NPM_VERSION..."
-      npm publish . --access public --ignore-scripts
+      npm publish . --access public --ignore-scripts --registry "$NPM_REGISTRY"
       EXTERNAL_PUBLISH_SUCCEEDED=1
       ;;
     verify-npm)
@@ -603,7 +603,7 @@ execute_release_step() {
       ;;
     publish-rust)
       echo "发布 Rust crate $RUST_PACKAGE_NAME@$RUST_VERSION..."
-      cargo publish --manifest-path rust/Cargo.toml
+      cargo publish --registry crates-io --manifest-path rust/Cargo.toml
       EXTERNAL_PUBLISH_SUCCEEDED=1
       ;;
     verify-registries)

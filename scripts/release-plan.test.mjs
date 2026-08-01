@@ -128,7 +128,9 @@ test('统一发布脚本不会吞掉 registry 异常并使用 Go Proxy 转义路
   assert.match(script, /GO_PROXY_MODULE_PATH='github\.com\/bsv8\/!multisig!pool\/v3'/);
   assert.match(script, /--user-agent "\$RELEASE_USER_AGENT"/);
   assert.match(script, /\.cargo_vcs_info\.json/);
-  assert.match(script, /npm publish \. --access public --ignore-scripts/);
+  assert.match(script, /npm publish \. --access public --ignore-scripts --registry "\$NPM_REGISTRY"/);
+  assert.match(script, /cargo publish --dry-run --registry crates-io --manifest-path rust\/Cargo\.toml/);
+  assert.match(script, /cargo publish --registry crates-io --manifest-path rust\/Cargo\.toml/);
 });
 
 test('npm registry 必须提供当前 commit 的 gitHead 并匹配产物 integrity', () => {

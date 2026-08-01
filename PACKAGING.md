@@ -27,7 +27,7 @@ node scripts/release-versions.mjs check
 
 唯一公开发布入口是 `scripts/release-all.sh`，`package.json` 的 `release` 命令只指向这个脚本。脚本固定读取版本清单，不接受临时版本、不交互确认、不自动猜测、不重试替代版本，也不创建 GitHub Release。
 
-正常发布顺序为：完整版本检查和三语言门禁、npm 与 Rust dry-run、Go `/v3` 临时消费者编译、registry/tag/认证检查、本地创建两个 tag、发布 npm、发布 Rust、原子推送两个 tag，最后验证 npm、crates.io 和 Go proxy。
+正常发布顺序为：完整版本检查和三语言门禁、npm 与 Rust dry-run、Go `/v3` 临时消费者编译、registry/tag/认证检查、本地创建两个 tag、使用固定 npmjs registry 发布 npm、使用 `crates-io` registry 发布 Rust、原子推送两个 tag，最后验证 npm、crates.io 和 Go proxy。
 
 发布前必须满足：当前分支是 `main`，工作树、暂存区和未跟踪文件为空，HEAD 已包含在 `origin/main`，且所有外部目标版本和 tag 尚不存在。npm、Rust、Git 或 registry 的网络、认证、限流及未知响应都会直接失败。registry 请求使用描述性 `User-Agent`，只有明确的 HTTP 404 才表示版本不存在。
 
