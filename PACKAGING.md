@@ -31,7 +31,7 @@ node scripts/release-versions.mjs check
 
 发布前必须满足：当前分支是 `main`，工作树、暂存区和未跟踪文件为空，HEAD 已包含在 `origin/main`，且所有外部目标版本和 tag 尚不存在。npm、Rust、Git 或 registry 的网络、认证、限流及未知响应都会直接失败。registry 请求使用描述性 `User-Agent`，只有明确的 HTTP 404 才表示版本不存在。
 
-发布完成验证时，Go proxy 请求使用 Go 规定的大小写转义 module path `github.com/bsv8/!multisig!pool/v3`；Rust crate 必须同时通过 crates.io checksum 和归档内 `.cargo_vcs_info.json` 的当前 commit/clean 状态校验，不能只依据 crate 名称和版本号判定来源。
+发布 npm 时使用项目目录而不是预构建 `.tgz`，让 npm 从当前干净 Git 工作树生成 registry metadata 并写入 `gitHead`；预构建包仍作为 `dist.integrity` 的精确校验基准。发布完成验证时，Go proxy 请求使用 Go 规定的大小写转义 module path `github.com/bsv8/!multisig!pool/v3`；Rust crate 必须同时通过 crates.io checksum 和归档内 `.cargo_vcs_info.json` 的当前 commit/clean 状态校验，不能只依据 crate 名称和版本号判定来源。
 
 ## 恢复规则
 

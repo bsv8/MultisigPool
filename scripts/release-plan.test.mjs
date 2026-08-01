@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildReleasePlan,
   classifyRegistryStatus,
   deriveReleaseTags,
   parseReleaseArguments,
+  validateNpmRegistryMetadata,
   validateReleasePreflight,
+  validateRustVcsInfo,
 } from './release-plan.mjs';
 
 test('正常发布步骤顺序固定', () => {
@@ -122,4 +128,85 @@ test('统一发布脚本不会吞掉 registry 异常并使用 Go Proxy 转义路
   assert.match(script, /GO_PROXY_MODULE_PATH='github\.com\/bsv8\/!multisig!pool\/v3'/);
   assert.match(script, /--user-agent "\$RELEASE_USER_AGENT"/);
   assert.match(script, /\.cargo_vcs_info\.json/);
+  assert.match(script, /npm publish \. --access public --ignore-scripts/);
+});
+
+test('npm registry 必须提供当前 commit 的 gitHead 并匹配产物 integrity', () => {
+  const common = {
+    expectedName: 'keymaster-multisig-pool',
+    expectedVersion: '3.0.0',
+    expectedCommit: 'fbde8f15da1c5d9e715e8c3d46d0b3c97c6e0041',
+    expectedIntegrity: 'sha512-local-artifact',
+  };
+  assert.doesNotThrow(() => validateNpmRegistryMetadata({
+    ...common,
+    metadata: { name: common.expectedName, version: common.expectedVersion, gitHead: common.expectedCommit, 'dist.integrity': common.expectedIntegrity },
+  }));
+  assert.throws(() => validateNpmRegistryMetadata({
+    ...common,
+    metadata: { name: common.expectedName, version: common.expectedVersion, dist: { integrity: common.expectedIntegrity } },
+  }), /gitHead undefined/);
+  assert.throws(() => validateNpmRegistryMetadata({
+    ...common,
+    metadata: { name: common.expectedName, version: common.expectedVersion, gitHead: 'other-commit', 'dist.integrity': common.expectedIntegrity },
+  }), /gitHead other-commit/);
+  assert.throws(() => validateNpmRegistryMetadata({
+    ...common,
+    metadata: { name: common.expectedName, version: common.expectedVersion, gitHead: common.expectedCommit, 'dist.integrity': 'sha512-other-artifact' },
+  }), /integrity does not match/);
+});
+
+test('从目录发布时 npm 会把当前 Git commit 放入 registry metadata', async () => {
+  const requests = [];
+  const repositoryDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const expectedCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryDirectory, encoding: 'utf8' }).trim();
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => {
+      requests.push({ method: request.method, body: Buffer.concat(chunks).toString('utf8') });
+      response.statusCode = 201;
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({ ok: true, rev: 'local-test' }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const registry = `http://127.0.0.1:${address.port}`;
+  const environment = {
+    ...process.env,
+    NPM_CONFIG_USERCONFIG: '/dev/null',
+    NPM_CONFIG_LOGLEVEL: 'error',
+  };
+  environment[`npm_config_//127.0.0.1:${address.port}/:_authToken`] = 'local-test-token';
+
+  try {
+    const child = spawn('npm', ['publish', '.', '--access', 'public', '--ignore-scripts', '--registry', registry], {
+      cwd: repositoryDirectory,
+      env: environment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const exitCode = await new Promise((resolve) => child.on('close', resolve));
+    assert.equal(exitCode, 0, `${stderr}\n${stdout}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+
+  const publishRequest = requests.find(({ method }) => method === 'PUT');
+  assert.ok(publishRequest, 'npm did not send a publish request');
+  const payload = JSON.parse(publishRequest.body);
+  assert.equal(payload.versions?.['3.0.0']?.gitHead, expectedCommit);
+  assert.match(payload.versions?.['3.0.0']?.dist?.integrity ?? '', /^sha512-/);
+});
+
+test('Cargo VCS 元数据省略 dirty 时表示干净产物', () => {
+  const expectedCommit = 'fbde8f15da1c5d9e715e8c3d46d0b3c97c6e0041';
+  assert.doesNotThrow(() => validateRustVcsInfo({ value: { git: { sha1: expectedCommit }, path_in_vcs: 'rust' }, expectedCommit }));
+  assert.doesNotThrow(() => validateRustVcsInfo({ value: { git: { sha1: expectedCommit, dirty: false } }, expectedCommit }));
+  assert.throws(() => validateRustVcsInfo({ value: { git: { sha1: expectedCommit, dirty: true } }, expectedCommit }), /clean Git commit/);
+  assert.throws(() => validateRustVcsInfo({ value: { git: { sha1: 'other-commit' } }, expectedCommit }), /git commit other-commit/);
 });

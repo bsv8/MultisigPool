@@ -37,6 +37,37 @@ export function classifyRegistryStatus(status, registryName, target) {
   throw new Error(`Unexpected ${registryName} response for ${target}: HTTP ${status}`);
 }
 
+export function validateNpmRegistryMetadata({
+  metadata,
+  expectedName,
+  expectedVersion,
+  expectedCommit,
+  expectedIntegrity,
+}) {
+  if (metadata?.name !== expectedName) {
+    throw new Error(`npm registry returned package ${metadata?.name}, expected ${expectedName}`);
+  }
+  if (metadata?.version !== expectedVersion) {
+    throw new Error(`npm registry returned version ${metadata?.version}, expected ${expectedVersion}`);
+  }
+  if (metadata?.gitHead !== expectedCommit) {
+    throw new Error(`npm registry returned gitHead ${metadata?.gitHead}, expected ${expectedCommit}`);
+  }
+  const registryIntegrity = metadata?.['dist.integrity'] ?? metadata?.dist?.integrity;
+  if (registryIntegrity !== expectedIntegrity) {
+    throw new Error('npm registry integrity does not match the local release artifact');
+  }
+}
+
+export function validateRustVcsInfo({ value, expectedCommit }) {
+  if (value?.git?.sha1 !== expectedCommit) {
+    throw new Error(`Rust crate git commit ${value?.git?.sha1}, expected ${expectedCommit}`);
+  }
+  if (value.git !== null && typeof value.git === 'object' && Object.hasOwn(value.git, 'dirty') && value.git.dirty !== false) {
+    throw new Error('Rust crate was not built from a clean Git commit');
+  }
+}
+
 export function validateReleasePreflight({
   resumeFrom = null,
   branch,

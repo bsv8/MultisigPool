@@ -260,21 +260,11 @@ verify_npm_registry() {
   expected_integrity="$(npm_artifact_integrity)"
   node --input-type=module - "$metadata_path" "$PACKAGE_NAME" "$NPM_VERSION" "$HEAD_COMMIT" "sha512-$expected_integrity" <<'NODE'
 import fs from 'node:fs';
+import { validateNpmRegistryMetadata } from './scripts/release-plan.mjs';
 
 const [metadataPath, expectedName, expectedVersion, expectedCommit, expectedIntegrity] = process.argv.slice(2);
 const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-if (metadata.name !== expectedName) {
-  throw new Error(`npm registry returned package ${metadata.name}, expected ${expectedName}`);
-}
-if (metadata.version !== expectedVersion) {
-  throw new Error(`npm registry returned version ${metadata.version}, expected ${expectedVersion}`);
-}
-if (metadata.gitHead !== expectedCommit) {
-  throw new Error(`npm registry returned gitHead ${metadata.gitHead}, expected ${expectedCommit}`);
-}
-if (metadata['dist.integrity'] !== expectedIntegrity && metadata.dist?.integrity !== expectedIntegrity) {
-  throw new Error('npm registry integrity does not match the local release artifact');
-}
+validateNpmRegistryMetadata({ metadata, expectedName, expectedVersion, expectedCommit, expectedIntegrity });
 NODE
 }
 
@@ -362,15 +352,11 @@ NODE
   fi
   node --input-type=module - "$vcs_info_path" "$HEAD_COMMIT" <<'NODE'
 import fs from 'node:fs';
+import { validateRustVcsInfo } from './scripts/release-plan.mjs';
 
 const [vcsInfoPath, expectedCommit] = process.argv.slice(2);
 const value = JSON.parse(fs.readFileSync(vcsInfoPath, 'utf8'));
-if (value.git?.sha1 !== expectedCommit) {
-  throw new Error(`Rust crate git commit ${value.git?.sha1}, expected ${expectedCommit}`);
-}
-if (value.git?.dirty !== false) {
-  throw new Error('Rust crate was not built from a clean Git commit');
-}
+validateRustVcsInfo({ value, expectedCommit });
 NODE
 }
 
@@ -609,7 +595,7 @@ execute_release_step() {
       ;;
     publish-npm)
       echo "发布 npm 包 $PACKAGE_NAME@$NPM_VERSION..."
-      npm publish "$NPM_ARTIFACT" --access public
+      npm publish . --access public --ignore-scripts
       EXTERNAL_PUBLISH_SUCCEEDED=1
       ;;
     verify-npm)
