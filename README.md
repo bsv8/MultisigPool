@@ -13,7 +13,7 @@ MultisigPool v3 是 Buyer / Seller / Arbiter 角色明确的 BSV 多签池实现
 
 ## 版本与发布
 
-版本事实源只有 [`release/versions.json`](release/versions.json)。协议版本与包发布版本含义不同：协议为 `bitfs.pool.v3` / `3`，npm 与 Go 为 `3.0.0`，Rust crate 为 `0.2.0`。
+版本事实源只有 [`release/versions.json`](release/versions.json)。协议版本与包发布版本含义不同：协议为 `bitfs.pool.v3` / `3`，npm、Go 与 Rust 发布版本统一为 `3.0.0`。
 
 修改版本清单后执行 `node scripts/release-versions.mjs sync`，审查生成的 Go、TypeScript、Rust 版本文件及包锁文件。只读检查命令是 `node scripts/release-versions.mjs check`。
 
@@ -37,7 +37,7 @@ const lockingScript = buildArbitratedPoolLock(roles)
 
 ## Go
 
-Go module 路径是 `github.com/bsv8/MultisigPool/v3`。角色值对象位于 `pkg/two_party_pool` 和 `pkg/arbitrated_pool`，根包只重新导出 v3 API，不保留旧函数别名。
+Go module 路径是 `github.com/bsv8/MultisigPool/v3`。公共聚合包位于 `github.com/bsv8/MultisigPool/v3/pkg`，角色值对象位于 `pkg/two_party_pool` 和 `pkg/arbitrated_pool`，不保留旧函数别名。
 
 ```go
 roles := arbitrated_pool.ArbitratedPoolRoles{

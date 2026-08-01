@@ -17,20 +17,20 @@ import {
 } from './release-plan.mjs';
 
 test('正常发布步骤顺序固定', () => {
-  const plan = buildReleasePlan({ resumeFrom: null, goVersion: '3.0.0', rustVersion: '0.2.0' });
+  const plan = buildReleasePlan({ resumeFrom: null, goVersion: '3.0.0', rustVersion: '3.0.0' });
   assert.deepEqual(plan.steps, ['preflight', 'create-local-tags', 'publish-npm', 'publish-rust', 'push-tags', 'verify']);
   assert.equal(plan.goTag, 'v3.0.0');
-  assert.equal(plan.rustTag, 'rust-v0.2.0');
+  assert.equal(plan.rustTag, 'rust-v3.0.0');
 });
 
 test('恢复点只选择施工单规定的后续步骤', () => {
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'rust', goVersion: '3.0.0', rustVersion: '0.2.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'rust', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
     'preflight', 'verify-npm', 'publish-rust', 'push-tags', 'verify',
   ]);
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'tags', goVersion: '3.0.0', rustVersion: '0.2.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'tags', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
     'preflight', 'verify-registries', 'verify-local-tags', 'push-tags', 'verify',
   ]);
-  assert.deepEqual(buildReleasePlan({ resumeFrom: 'verify', goVersion: '3.0.0', rustVersion: '0.2.0' }).steps, [
+  assert.deepEqual(buildReleasePlan({ resumeFrom: 'verify', goVersion: '3.0.0', rustVersion: '3.0.0' }).steps, [
     'preflight', 'verify-release',
   ]);
 });
@@ -39,8 +39,8 @@ test('恢复参数、版本和 tag 推导不接受隐式值', () => {
   assert.deepEqual(parseReleaseArguments([]), { resumeFrom: null });
   assert.deepEqual(parseReleaseArguments(['--resume-from', 'rust']), { resumeFrom: 'rust' });
   assert.throws(() => parseReleaseArguments(['--resume-from', 'npm']), /Usage/);
-  assert.throws(() => deriveReleaseTags('3', '0.2.0'), /Invalid Go release version/);
-  assert.throws(() => buildReleasePlan({ resumeFrom: 'unknown', goVersion: '3.0.0', rustVersion: '0.2.0' }), /Unknown resume point/);
+  assert.throws(() => deriveReleaseTags('3', '3.0.0'), /Invalid Go release version/);
+  assert.throws(() => buildReleasePlan({ resumeFrom: 'unknown', goVersion: '3.0.0', rustVersion: '3.0.0' }), /Unknown resume point/);
 });
 
 test('发布前置条件的纯校验拒绝非 main、脏工作树、未推送 HEAD 和已存在产物', () => {
@@ -126,6 +126,8 @@ test('统一发布脚本不会吞掉 registry 异常并使用 Go Proxy 转义路
   assert.doesNotMatch(script, /case\s+"\$\(classify_registry_status/);
   assert.match(script, /if ! registry_state="\$\(classify_registry_status/);
   assert.match(script, /GO_PROXY_MODULE_PATH='github\.com\/bsv8\/!multisig!pool\/v3'/);
+  assert.match(script, /import pool \\\"\$GO_MODULE_PATH\/pkg\\\"/);
+  assert.match(script, /GOWORK=off go mod tidy && GOWORK=off go build -buildvcs=false/);
   assert.match(script, /--user-agent "\$RELEASE_USER_AGENT"/);
   assert.match(script, /\.cargo_vcs_info\.json/);
   assert.match(script, /npm publish \. --access public --ignore-scripts --registry "\$NPM_REGISTRY"/);

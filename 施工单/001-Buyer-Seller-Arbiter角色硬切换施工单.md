@@ -60,7 +60,7 @@ Seller + Arbiter
 - 所有公共类型、函数、参数、返回字段、文件名、目录名、测试名、fixture 字段、环境变量和文档术语同时切换。
 - 公钥顺序、输出顺序、签名合并顺序、验签逻辑和共享测试向量同时切换。
 - 协议标识从 `bitfs.pool.v2` 升级为 `bitfs.pool.v3`，协议版本改为 `3`。
-- npm 发布破坏性主版本；Go module 使用 `/v3` 语义导入路径；Rust crate 若对外发布，由当前 `0.x` 提升到下一个破坏版本 `0.2.0`。
+- npm、Go module 与 Rust crate 发布版本统一为 `3.0.0`；Go module 使用 `/v3` 语义导入路径。
 - 生成物只能由构建命令重新生成，禁止手工修改 `dist/`。
 
 ### 3.2 不在本次范围内
@@ -333,7 +333,7 @@ Rust 核心库目前主要提供通用多签能力，不应为了角色切换把
 
 | 文件 | 施工内容 |
 | --- | --- |
-| `rust/Cargo.toml`、`rust/Cargo.lock` | 若发布 crate，版本提升至 `0.2.0`；同步依赖锁。 |
+| `rust/Cargo.toml`、`rust/Cargo.lock` | crate 版本与 npm、Go 统一为 `3.0.0`；同步依赖锁。 |
 | `rust/README.md` | 使用 Buyer/Seller/Arbiter 示例和标准 2-of-2、2-of-3 表达。 |
 | `rust/examples/cross_validation.rs` | 使用新公钥顺序和 v3 fixture。 |
 | `rust/examples/cross_validation_comparison.rs` | 更新角色字段、输出顺序和预期 hex。 |
@@ -351,7 +351,7 @@ Rust 核心库目前主要提供通用多签能力，不应为了角色切换把
 | `docs/comparison-tests.md` | 更新目录、fixture、顺序及三种 2-of-3 组合。 |
 | `docs/typescript_golang_rust_cross_validation.md` | 更新三语言 v3 向量和运行命令。 |
 | `RUST_IMPLEMENTATION.md` | 更新角色映射与协议版本。 |
-| `PACKAGING.md` | 记录 npm 3.x、Go `/v3`、Rust 破坏版本和禁止混用规则。 |
+| `PACKAGING.md` | 记录三语言统一 `3.x`、Go `/v3` 和禁止混用规则。 |
 | `package.json`、`package-lock.json` | npm 版本提升至 `3.0.0`，描述和关键词更新。 |
 | `Makefile` | 测试目标和提示文字使用新目录名。 |
 | `scripts/build.sh` | 更新 Go `/v3` 与新源码目录检查。 |
@@ -431,7 +431,7 @@ rg -n -i 'server|client|serverAmount|clientAmount|SignAsA|SignAsB|3-of-2' \
 
 ### 9.5 发布与接入
 
-- [ ] npm 版本为 `3.0.0`，Go module/import 为 `/v3`，Rust 版本策略已落实。
+- [ ] npm、Go 与 Rust 发布版本统一为 `3.0.0`，Go module/import 为 `/v3`。
 - [ ] v2 tag、构建说明和依赖锁已确认可用，供历史池继续退出资金。
 - [ ] 发布说明明确写出：这是破坏性协议变更，不支持旧池原地升级。
 - [ ] 第三方接入文档包含角色表、公钥顺序、输出顺序和三种签名组合。

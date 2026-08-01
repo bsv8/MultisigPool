@@ -120,8 +120,11 @@ export function validateVersionsManifest(value) {
         ...(Object.hasOwn(value.packages, 'npm') ? validateSemver(value.packages.npm, 'versions.json.packages.npm') : []),
         ...(Object.hasOwn(value.packages, 'go') ? validateSemver(value.packages.go, 'versions.json.packages.go') : []),
         ...(Object.hasOwn(value.packages, 'rust') ? validateSemver(value.packages.rust, 'versions.json.packages.rust') : []),
-        ...(typeof value.packages.npm === 'string' && typeof value.packages.go === 'string' && value.packages.npm !== value.packages.go
-          ? [`versions.json.packages.npm and versions.json.packages.go must be equal, actual npm=${value.packages.npm}, go=${value.packages.go}`]
+        ...(typeof value.packages.npm === 'string'
+          && typeof value.packages.go === 'string'
+          && typeof value.packages.rust === 'string'
+          && (value.packages.npm !== value.packages.go || value.packages.npm !== value.packages.rust)
+          ? [`versions.json package versions must be equal, actual npm=${value.packages.npm}, go=${value.packages.go}, rust=${value.packages.rust}`]
           : []),
       ]
     : [];

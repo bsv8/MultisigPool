@@ -476,12 +476,12 @@ check_go_module_consumer() {
   printf '%s\n' \
     'package main' \
     '' \
-    "import pool \"$GO_MODULE_PATH\"" \
+    "import pool \"$GO_MODULE_PATH/pkg\"" \
     '' \
     'func main() {' \
     '    _ = pool.Protocol' \
     '}' > "$consumer_directory/main.go"
-  if ! (cd "$consumer_directory" && GOWORK=off go build ./...); then
+  if ! (cd "$consumer_directory" && GOWORK=off go mod tidy && GOWORK=off go build -buildvcs=false ./...); then
     fail 'Go module consumer compilation failed'
   fi
 }

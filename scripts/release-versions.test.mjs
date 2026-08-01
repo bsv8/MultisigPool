@@ -23,7 +23,7 @@ import {
 const validManifest = Object.freeze({
   schemaVersion: 1,
   protocol: Object.freeze({ id: 'bitfs.pool.v3', version: 3, goModuleMajor: 3 }),
-  packages: Object.freeze({ npm: '3.0.0', go: '3.0.0', rust: '0.2.0' }),
+  packages: Object.freeze({ npm: '3.0.0', go: '3.0.0', rust: '3.0.0' }),
 });
 
 const fixtureFiles = Object.freeze([
@@ -102,10 +102,12 @@ test('协议字段和包版本必须使用施工单规定的类型与格式', ()
   assert.throws(() => parseVersionsManifest(JSON.stringify(splitVersionLine)), /complete SemVer/);
 });
 
-test('npm 和 Go 版本线必须相同', () => {
-  const invalid = structuredClone(validManifest);
-  invalid.packages.go = '3.0.1';
-  assert.throws(() => parseVersionsManifest(JSON.stringify(invalid)), /must be equal/);
+test('npm、Go 和 Rust 版本线必须完全相同', () => {
+  for (const packageName of ['npm', 'go', 'rust']) {
+    const invalid = structuredClone(validManifest);
+    invalid.packages[packageName] = '3.0.1';
+    assert.throws(() => parseVersionsManifest(JSON.stringify(invalid)), /package versions must be equal/);
+  }
 });
 
 test('解析错误消息使用英文', () => {
@@ -133,14 +135,14 @@ test('check 能发现所有版本镜像文件被篡改', () => {
     {
       name: 'rust/Cargo.toml',
       relativePath: 'rust/Cargo.toml',
-      mutate: (text) => text.replace('version = "0.2.0"', 'version = "0.2.1"'),
-      expected: /rust\/Cargo\.toml: package\.version expected "0\.2\.0", actual "0\.2\.1"/,
+      mutate: (text) => text.replace('version = "3.0.0"', 'version = "3.0.1"'),
+      expected: /rust\/Cargo\.toml: package\.version expected "3\.0\.0", actual "3\.0\.1"/,
     },
     {
       name: 'rust/Cargo.lock',
       relativePath: 'rust/Cargo.lock',
-      mutate: (text) => text.replace('name = "keymaster-multisig-rust"\nversion = "0.2.0"', 'name = "keymaster-multisig-rust"\nversion = "0.2.1"'),
-      expected: /rust\/Cargo\.lock: keymaster-multisig-rust version expected "0\.2\.0", actual "0\.2\.1"/,
+      mutate: (text) => text.replace('name = "keymaster-multisig-rust"\nversion = "3.0.0"', 'name = "keymaster-multisig-rust"\nversion = "3.0.1"'),
+      expected: /rust\/Cargo\.lock: keymaster-multisig-rust version expected "3\.0\.0", actual "3\.0\.1"/,
     },
     {
       name: 'internal/versioninfo/version.go',
@@ -157,8 +159,8 @@ test('check 能发现所有版本镜像文件被篡改', () => {
     {
       name: 'rust/src/version.rs',
       relativePath: 'rust/src/version.rs',
-      mutate: (text) => text.replace('pub const RELEASE_VERSION: &str = "0.2.0"', 'pub const RELEASE_VERSION: &str = "0.2.1"'),
-      expected: /rust\/src\/version\.rs: RELEASE_VERSION expected "0\.2\.0", actual "0\.2\.1"/,
+      mutate: (text) => text.replace('pub const RELEASE_VERSION: &str = "3.0.0"', 'pub const RELEASE_VERSION: &str = "3.0.1"'),
+      expected: /rust\/src\/version\.rs: RELEASE_VERSION expected "3\.0\.0", actual "3\.0\.1"/,
     },
   ];
 
@@ -214,21 +216,21 @@ test('版本目标字段为零次或多次时都会失败', () => {
 
   const cargoText = fs.readFileSync(path.join(ROOT_DIRECTORY, 'rust/Cargo.toml'), 'utf8');
   assert.throws(
-    () => renderCargoManifest(cargoText.replace('version = "0.2.0"\n', ''), '0.2.1'),
+    () => renderCargoManifest(cargoText.replace('version = "3.0.0"\n', ''), '3.0.1'),
     /expected exactly one package version field, found 0/,
   );
   assert.throws(
-    () => renderCargoManifest(cargoText.replace('version = "0.2.0"\n', 'version = "0.2.0"\nversion = "0.2.0"\n'), '0.2.1'),
+    () => renderCargoManifest(cargoText.replace('version = "3.0.0"\n', 'version = "3.0.0"\nversion = "3.0.0"\n'), '3.0.1'),
     /expected exactly one package version field, found 2/,
   );
 
   const lockText = fs.readFileSync(path.join(ROOT_DIRECTORY, 'rust/Cargo.lock'), 'utf8');
   assert.throws(
-    () => renderCargoLock(lockText.replace(/name = "keymaster-multisig-rust"\nversion = "0\.2\.0"\n/, ''), '0.2.1'),
+    () => renderCargoLock(lockText.replace(/name = "keymaster-multisig-rust"\nversion = "3\.0\.0"\n/, ''), '3.0.1'),
     /expected exactly one keymaster-multisig-rust package, found 0/,
   );
   assert.throws(
-    () => renderCargoLock(`${lockText}\n${lockText.match(/name = "keymaster-multisig-rust"\nversion = "0\.2\.0"\n/)[0]}`, '0.2.1'),
+    () => renderCargoLock(`${lockText}\n${lockText.match(/name = "keymaster-multisig-rust"\nversion = "3\.0\.0"\n/)[0]}`, '3.0.1'),
     /expected exactly one keymaster-multisig-rust package, found 2/,
   );
 });

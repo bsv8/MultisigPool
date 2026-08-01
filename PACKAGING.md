@@ -10,9 +10,9 @@
 - 协议版本：`3`
 - npm：`keymaster-multisig-pool@3.0.0`
 - Go module：`github.com/bsv8/MultisigPool/v3`，tag 为 `v3.0.0`
-- Rust crate：`keymaster-multisig-rust@0.2.0`，源码追踪 tag 为 `rust-v0.2.0`
+- Rust crate：`keymaster-multisig-rust@3.0.0`，源码追踪 tag 为 `rust-v3.0.0`
 
-协议版本参与交易校验，发布版本只描述对应语言包。生成的 `internal/versioninfo/version.go`、`src/version.ts`、`rust/src/version.rs`、包文件和锁文件均不得手工修改。
+协议版本参与交易校验，发布版本只描述对应语言包。npm、Go 和 Rust 必须保持完全相同的发布版本。生成的 `internal/versioninfo/version.go`、`src/version.ts`、`rust/src/version.rs`、包文件和锁文件均不得手工修改。
 
 修改清单后先运行：
 
