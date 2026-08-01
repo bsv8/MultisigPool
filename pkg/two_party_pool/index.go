@@ -1,6 +1,8 @@
 package two_party_pool
 
-// Protocol identifies the only protocol understood by this package.
-const Protocol = "bitfs.pool.v3"
+import "github.com/bsv8/MultisigPool/v3/internal/versioninfo"
 
-const Version uint32 = 3
+const (
+	Protocol = versioninfo.Protocol
+	Version  = versioninfo.ProtocolVersion
+)

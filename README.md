@@ -11,6 +11,14 @@ MultisigPool v3 是 Buyer / Seller / Arbiter 角色明确的 BSV 多签池实现
 
 协议标识是 `bitfs.pool.v3`，协议版本是 `3`。v3 是破坏性切换，不读取、迁移或兼容旧 v2 池。
 
+## 版本与发布
+
+版本事实源只有 [`release/versions.json`](release/versions.json)。协议版本与包发布版本含义不同：协议为 `bitfs.pool.v3` / `3`，npm 与 Go 为 `3.0.0`，Rust crate 为 `0.2.0`。
+
+修改版本清单后执行 `node scripts/release-versions.mjs sync`，审查生成的 Go、TypeScript、Rust 版本文件及包锁文件。只读检查命令是 `node scripts/release-versions.mjs check`。
+
+三语言发布只有 `scripts/release-all.sh` 入口；它不接受临时版本，不自动提交代码或修改版本清单。发布中断时只能使用同一入口显式恢复：`--resume-from rust`、`--resume-from tags` 或 `--resume-from verify`。
+
 ## TypeScript
 
 ```ts

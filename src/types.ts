@@ -1,8 +1,9 @@
 import type Transaction from '@bsv/sdk/transaction/Transaction';
 import type { PublicKey } from '@bsv/sdk/primitives';
 
-export const Protocol = 'bitfs.pool.v3' as const;
-export const Version = 3 as const;
+import { Protocol, Version } from './version';
+
+export { Protocol, ProtocolVersion, Version, ReleaseVersion } from './version';
 
 export interface PoolProtocolMetadata {
   readonly protocol: typeof Protocol;

@@ -6,21 +6,18 @@ import (
 	"github.com/bsv-blockchain/go-sdk/script"
 	tx "github.com/bsv-blockchain/go-sdk/transaction"
 	sighash "github.com/bsv-blockchain/go-sdk/transaction/sighash"
+	"github.com/bsv8/MultisigPool/v3/internal/versioninfo"
 	arbitrated "github.com/bsv8/MultisigPool/v3/pkg/arbitrated_pool"
 	"github.com/bsv8/MultisigPool/v3/pkg/libs"
 	twoParty "github.com/bsv8/MultisigPool/v3/pkg/two_party_pool"
 )
 
-// ProtocolVersion 是交易数据中使用的协议版本。
-const ProtocolVersion uint32 = 3
-
-// ReleaseVersion 是 Go module 与 npm 包对应的发布版本，不参与交易协议校验。
-const ReleaseVersion = "3.0.0"
-
-// Version 保留为公共协议版本入口，类型与各池 StateInput.Version 一致。
-const Version uint32 = ProtocolVersion
-
-const Protocol = "bitfs.pool.v3"
+const (
+	ProtocolVersion = versioninfo.ProtocolVersion
+	ReleaseVersion  = versioninfo.GoReleaseVersion
+	Version         = ProtocolVersion
+	Protocol        = versioninfo.Protocol
+)
 
 type MultiSig = libs.MultiSig
 type UTXO = libs.UTXO

@@ -12,7 +12,6 @@ help:
 	@echo "  dev       - 开发模式"
 	@echo "  lint      - 代码检查"
 	@echo "  format    - 代码格式化"
-	@echo "  publish   - 发布项目"
 	@echo ""
 	@echo "Rust 相关命令:"
 	@echo "  rust-build         - 构建 Rust 项目"
@@ -59,11 +58,6 @@ format:
 	@echo "✨ 代码格式化..."
 	npx prettier --write "src/**/*.ts"
 	go fmt ./...
-
-# 发布项目
-publish:
-	@echo "📦 发布项目..."
-	npm run publish:all
 
 # Go 相关命令
 go-build:
@@ -125,4 +119,4 @@ all-test:
 	cd rust && cargo test
 	@echo ""
 	@echo "Running cross-validation..."
-	./scripts/run_rust_go_cross_validation.sh 
+	./scripts/run_rust_go_cross_validation.sh

@@ -1,4 +1,8 @@
 package arbitrated_pool
 
-const Protocol = "bitfs.pool.v3"
-const Version uint32 = 3
+import "github.com/bsv8/MultisigPool/v3/internal/versioninfo"
+
+const (
+	Protocol = versioninfo.Protocol
+	Version  = versioninfo.ProtocolVersion
+)

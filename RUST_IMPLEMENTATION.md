@@ -4,6 +4,8 @@
 
 `rust/` 是面向 WebAssembly 和原生测试的 Rust 多签核心库，协议版本为 `bitfs.pool.v3` / `3`。npm 与 Go module 发布版本为 `3.0.0`，Rust crate 发布版本为 `0.2.0`；这些发布版本不参与交易协议校验。Rust 核心库负责 P2MS 锁定脚本、假签名脚本、签名脚本组合以及 ECDSA 预哈希签名等核心能力。
 
+Rust 的协议与 crate 版本常量由 `rust/src/version.rs` 生成，版本事实源为 `release/versions.json`。该文件与 Go、TypeScript 的生成版本文件一样禁止手工修改。
+
 Rust 核心库不代替 Go/TypeScript 的完整交易池 API。完整交易字节交叉验证由仓库中的对照程序负责：
 
 - `examples/rust_go_comparison/` 验证 2-of-2 Buyer/Seller 交易步骤。
@@ -30,7 +32,8 @@ rust/
 │   ├── lib.rs
 │   ├── error.rs
 │   ├── types.rs
-│   └── multisig.rs
+│   ├── multisig.rs
+│   └── version.rs
 ├── tests/
 ├── examples/cross_validation.rs
 └── examples/cross_validation_comparison.rs

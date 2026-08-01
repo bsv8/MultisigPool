@@ -4,11 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# 版本一致性是完整门禁的第一项。
+node scripts/release-versions.mjs check
+node --test scripts/release-versions.test.mjs scripts/release-plan.test.mjs
 npm test -- --runInBand
 npm run lint
 npm run build
 go vet ./...
 go test ./...
+npx tsx examples/offline_two_party_pool/main.ts
 go run examples/two_party_pool_compare/compare.go
 go run examples/arbitrated_pool_compare/compare.go
 if rg -n -i '\b(server|client)\b|serverAmount|clientAmount|SignAsA|SignAsB|3-of-2' \

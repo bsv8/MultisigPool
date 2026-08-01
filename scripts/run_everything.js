@@ -3,7 +3,7 @@
 const { spawnSync } = require('node:child_process');
 
 const commands = [
-  ['Complete release gate', ['bash', 'scripts/run_all_tests.sh']],
+  ['完整发布门禁', ['bash', 'scripts/run_all_tests.sh']],
 ];
 
 for (const [name, command] of commands) {

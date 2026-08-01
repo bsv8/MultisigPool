@@ -28,9 +28,7 @@
     "lint:go": "golangci-lint run",
     "clean": "rm -rf dist build coverage.out coverage.html",
     "prepublishOnly": "npm run build",
-    "publish:npm": "./scripts/publish-npm.sh",
-    "publish:go": "./scripts/publish-go.sh",
-    "publish:all": "./scripts/publish-all.sh"
+    "release": "./scripts/release-all.sh"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

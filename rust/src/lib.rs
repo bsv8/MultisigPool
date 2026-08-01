@@ -1,10 +1,12 @@
 mod error;
 mod multisig;
 mod types;
+mod version;
 
 pub use error::{MultisigError, Result};
 pub use multisig::Multisig;
 pub use types::*;
+pub use version::{PROTOCOL, PROTOCOL_VERSION, RELEASE_VERSION, VERSION};
 
 use serde_wasm_bindgen as swbg;
 use wasm_bindgen::prelude::*;

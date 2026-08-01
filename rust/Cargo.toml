@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Keymaster Team"]
 license = "MIT"
 description = "Rust implementation of Keymaster Multisig using bsv-wasm"
-repository = "https://github.com/your-org/MultisigPool"
+repository = "https://github.com/bsv8/MultisigPool"
 keywords = ["bitcoin", "bsv", "multisig", "cryptography"]
 categories = ["cryptography::cryptocurrencies"]
 

@@ -1,4 +1,5 @@
 // MultisigPool TypeScript SDK v3。
+export { Protocol, ProtocolVersion, Version, ReleaseVersion } from './version';
 export * from './types';
 export * from './crypto/go_rfc6979';
 export { default as MultiSig } from './libs/MULTISIG';

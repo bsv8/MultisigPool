@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "protocol": {
+    "id": "bitfs.pool.v3",
+    "version": 3,
+    "goModuleMajor": 3
+  },
+  "packages": {
+    "npm": "3.0.0",
+    "go": "3.0.0",
+    "rust": "0.2.0"
+  }
+}
