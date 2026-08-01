@@ -126,6 +126,18 @@ func TestBuildTriplePoolStateRejectsMalformedPreviousState(t *testing.T) {
 	if _, err := MergeTriplePoolServerA(state.Hex(), serverSig, aSig); err != nil {
 		t.Fatalf("server+A merge failed: %v", err)
 	}
+	if _, err := MergeTriplePoolServerAWithRoles(state.Hex(), aSig, serverSig, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000); err == nil {
+		t.Fatal("role-swapped server+A signatures were accepted")
+	}
+	if _, err := MergeTriplePoolServerBWithRoles(state.Hex(), bSig, serverSig, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000); err == nil {
+		t.Fatal("role-swapped server+B signatures were accepted")
+	}
+	if _, err := MergeTriplePoolServerAWithRoles(state.Hex(), serverSig, aSig, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000); err != nil {
+		t.Fatalf("role-checked server+A merge failed: %v", err)
+	}
+	if _, err := MergeTriplePoolServerBWithRoles(state.Hex(), serverSig, bSig, serverKey.PubKey(), aKey.PubKey(), bKey.PubKey(), 10000); err != nil {
+		t.Fatalf("role-checked server+B merge failed: %v", err)
+	}
 }
 
 func mustTestPrivateKey(t *testing.T, value byte) *ec.PrivateKey {
